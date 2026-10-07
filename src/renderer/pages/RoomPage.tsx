@@ -176,11 +176,11 @@ export default function RoomPage({
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#0b1020] px-5 py-6 text-slate-50 sm:px-8">
+    <main className="relative flex min-h-screen flex-col overflow-hidden bg-[#0b1020] px-4 py-4 text-slate-50 sm:px-6 sm:py-5 lg:h-screen">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.1),transparent_48%)]" />
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col">
-        <header className="flex items-center justify-between border-b border-slate-800/80 pb-5">
+      <div className="relative mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[1600px] flex-1 flex-col lg:min-h-0">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
           <div>
             <h1 className="text-base font-semibold">Sala de transmissão</h1>
             <p className="mt-1 text-xs text-slate-500">{isHost ? 'Você é o host' : 'Você entrou como participante'}</p>
@@ -197,8 +197,8 @@ export default function RoomPage({
           </span>
         </header>
 
-        <div className="grid flex-1 gap-6 py-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center">
-          <section className="flex min-h-[420px] flex-col items-center justify-center overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl shadow-black/10 sm:p-7">
+        <div className="grid flex-1 gap-4 py-4 lg:min-h-0 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-5 lg:py-5">
+          <section className="order-1 flex min-h-[420px] flex-col items-center justify-center overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl shadow-black/10 sm:p-7 lg:order-2 lg:min-h-0">
             {presentationStream && isReceivingVideo ? (
               <>
                 <div className="mb-4 flex w-full items-center justify-between gap-3">
@@ -246,7 +246,7 @@ export default function RoomPage({
             )}
           </section>
 
-          <aside className="space-y-4">
+          <aside className="order-2 flex flex-col gap-4 lg:order-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
             <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-slate-200">Participantes</h2>
