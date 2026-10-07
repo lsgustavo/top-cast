@@ -1,0 +1,7 @@
+node_modules
+dist/
+dist-electron/
+dist-server/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
