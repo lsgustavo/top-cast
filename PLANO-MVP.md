@@ -92,14 +92,18 @@ alheios ao escopo nesses commits.
 
 ### Etapa 5 — Testes de ponta a ponta e critérios de rede
 
-- [ ] Adicionar o máximo de testes automatizados viáveis para criação/entrada,
+- [x] Adicionar o máximo de testes automatizados viáveis para criação/entrada,
   signaling autorizado, erro e encerramento.
-- [ ] Executar `npm test` e `npm run build:windows`.
+- [x] Adicionar `npm run test:signaling-smoke`, que valida com clientes Socket.IO
+  reais o fluxo de sala, autorização, configuração ICE e encerramento.
+- [x] Executar `npm test` (20 testes passaram) e `npm run build:windows`.
+- [x] Executar o smoke test local com TURN_URLS e uma chave de teste
+  (valida geração de credenciais, não conectividade com um relay real).
 - [ ] Testar manualmente em dois computadores, em redes distintas, com TURN
   obrigatório (validar também a seleção relay no diagnóstico WebRTC).
 - [ ] Registrar qualquer limitação reproduzível e corrigir antes de aceitar o
   MVP.
-- [ ] Commit próprio para alterações automatizáveis. O teste em outra máquina é
+- [x] Commit próprio para alterações automatizáveis. O teste em outra máquina é
   um gate manual e só pode ser marcado como feito após execução real.
 
 ### Etapa 6 — Build e distribuição Windows

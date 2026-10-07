@@ -12,6 +12,7 @@
     "build:windows": "npm run build && node scripts/verify-production-build.mjs",
     "build:installer": "npm run build:windows && electron-builder --win nsis --x64",
     "verify:production": "node scripts/verify-production-build.mjs",
+    "test:signaling-smoke": "node scripts/smoke-test-signaling.mjs",
     "preview": "vite preview --host",
     "test": "tsx --test src/server/services/room-service.test.ts src/server/services/signaling-validation.test.ts src/server/services/ice-credentials.test.ts tests/ice-configuration.test.ts tests/reconnect-identity.test.ts"
   },

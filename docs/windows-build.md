@@ -76,3 +76,18 @@ This smoke-test setup is plain HTTP and is not a production deployment. A
 production service should use HTTPS/WSS, a stable reachable address, and
 appropriate network/firewall rules. The installer has not been tested on a
 separate physical computer in this environment.
+
+## Signaling integration smoke test
+
+With the signaling server running, execute:
+
+```powershell
+npm run test:signaling-smoke
+```
+
+The script connects two real Socket.IO clients and checks room creation/join,
+denial of ICE credentials outside a room, STUN/TURN configuration, WebRTC offer
+authorization, and room closure. To target another server, set
+`$env:SIGNALING_URL` before running the script. This validates the signaling
+service, not media connectivity through a public TURN relay; that still needs
+the separate two-computer, different-network test.
