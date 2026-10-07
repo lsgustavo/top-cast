@@ -68,18 +68,18 @@ alheios ao escopo nesses commits.
   uma sala; limitar pedidos repetidos.
 - [x] Adicionar testes para URLs/configuração, assinatura e expiração das
   credenciais.
-- [x] Commit próprio após testes (`pendente` até gravar este commit).
+- [x] Commit próprio após testes (`036f5dc`).
 
 ### Etapa 3 — Usar TURN/STUN no WebRTC
 
-- [ ] Buscar a configuração ICE autenticada pela participação na sala antes de
+- [x] Buscar a configuração ICE autenticada pela participação na sala antes de
   criar cada RTCPeerConnection.
-- [ ] Aplicá-la em conexões host e convidados e preservar renegociação/restart
+- [x] Aplicá-la em conexões host e convidados e preservar renegociação/restart
   ICE sem reutilizar configurações vazias por engano.
-- [ ] Tratar indisponibilidade do serviço ICE com estado/erro explícito, sem
+- [x] Tratar indisponibilidade do serviço ICE com estado/erro explícito, sem
   simular sucesso.
-- [ ] Cobrir as regras de seleção/configuração com testes e validar build.
-- [ ] Commit próprio após validação.
+- [x] Cobrir as regras de seleção/configuração com testes e validar build.
+- [x] Commit próprio após validação (`pendente` até gravar este commit).
 
 ### Etapa 4 — Estabilização de conexão e participantes
 

@@ -35,9 +35,11 @@ For Internet connectivity, deploy a Coturn-compatible TURN service and provide
 the signaling server with `TURN_URLS` (comma-separated `turn:`/`turns:` URLs)
 and `TURN_SHARED_SECRET` (at least 32 characters). The TURN service and
 signaling server must use the same REST shared secret. Keep that secret only in
-the server environment; TopCast issues participant-scoped credentials that
-expire after 24 hours. Without these settings clients receive STUN only, which
-does not guarantee connectivity through restrictive NATs/firewalls.
+the server environment; after a participant joins a room, TopCast requests
+participant-scoped credentials that expire after 24 hours and applies the
+returned ICE configuration to each WebRTC peer connection. Without these
+settings clients receive STUN only, which does not guarantee connectivity
+through restrictive NATs/firewalls.
 
 Example server environment (use a secret manager in production):
 
