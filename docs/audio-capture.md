@@ -8,11 +8,8 @@ isolated to the selected window. It can include browsers, games, music players,
 and communication apps.
 
 System audio is off unless the host explicitly enables it in the share dialog.
-The dialog warns that communication-app audio is included. The microphone is a
-separate WebRTC track, is off by default, and is released when disabled. Chromium
-echo cancellation, noise suppression, and automatic gain control are requested
-for the microphone track only; these options do not filter the system loopback
-track.
+The dialog warns that communication-app audio is included. TopCast does not
+request microphone access or capture/transmit microphone audio.
 
 When a call is in progress, leave system audio disabled unless retransmitting
 the call is intentional. Selecting a window does not make the system-audio

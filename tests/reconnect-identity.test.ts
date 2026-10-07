@@ -14,14 +14,12 @@ const room: RoomSnapshot = {
       displayName: 'Host name',
       role: 'host',
       joinedAt: 1_000,
-      microphoneEnabled: false,
     },
     {
       id: 'guest-1',
       displayName: 'Guest name',
       role: 'guest',
       joinedAt: 1_001,
-      microphoneEnabled: false,
     },
   ],
 };

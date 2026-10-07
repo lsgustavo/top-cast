@@ -197,25 +197,7 @@ describe('RoomService', () => {
     assert.equal(service.authorizeSignal('not-a-member', 'guest', 'ice-candidate'), 'NOT_IN_ROOM');
   });
 
-  it('tracks each participant microphone state and rejects non-members', () => {
-    const service = new RoomService();
-    const created = service.create('host', 'Host', 100);
-    assert.equal(created.ok, true);
-    if (!created.ok) return;
-    const joined = service.join('guest', created.room.inviteCode, 'Guest', 110);
-    assert.equal(joined.ok, true);
-    if (!joined.ok) return;
-
-    assert.equal(created.room.participants[0]?.microphoneEnabled, false);
-    assert.equal(joined.room.participants[1]?.microphoneEnabled, false);
-
-    const updated = service.setMicrophoneEnabled('guest', true);
-    assert.equal(updated?.participants.find((participant) => participant.id === 'guest')?.microphoneEnabled, true);
-    assert.equal(updated?.participants.find((participant) => participant.id === 'host')?.microphoneEnabled, false);
-    assert.equal(service.setMicrophoneEnabled('outsider', true), undefined);
-  });
-
-  it('allows a disconnected guest to rejoin by invite with microphone off', () => {
+  it('allows a disconnected guest to rejoin with a new session ID', () => {
     const service = new RoomService();
     const created = service.create('host', 'Host', 100);
     assert.equal(created.ok, true);
@@ -224,12 +206,11 @@ describe('RoomService', () => {
     assert.equal(joined.ok, true);
     if (!joined.ok) return;
 
-    service.setMicrophoneEnabled('first-guest-socket', true);
     service.leave('first-guest-socket', 120);
     const rejoined = service.join('reconnected-guest-socket', created.room.inviteCode, 'Guest', 130);
     assert.equal(rejoined.ok, true);
     if (!rejoined.ok) return;
     assert.equal(rejoined.room.participants.at(-1)?.id, 'reconnected-guest-socket');
-    assert.equal(rejoined.room.participants.at(-1)?.microphoneEnabled, false);
+    assert.equal(rejoined.room.participants.at(-1)?.displayName, 'Guest');
   });
 });

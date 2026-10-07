@@ -61,7 +61,6 @@ export class RoomService {
       displayName,
       role: 'host',
       joinedAt: now,
-      microphoneEnabled: false,
       presence: 'available',
     };
 
@@ -122,7 +121,6 @@ export class RoomService {
       displayName,
       role: 'guest',
       joinedAt: now,
-      microphoneEnabled: false,
       presence: 'available',
     };
     room.participants.set(socketId, participant);
@@ -216,18 +214,6 @@ export class RoomService {
       return undefined;
     }
     participant.presence = presence;
-    return this.toSnapshot(room);
-  }
-
-  setMicrophoneEnabled(socketId: string, enabled: boolean): RoomSnapshot | undefined {
-    const roomId = this.roomIdsBySocketId.get(socketId);
-    const room = roomId ? this.roomsById.get(roomId) : undefined;
-    const participant = room?.participants.get(socketId);
-    if (!room || !participant) {
-      return undefined;
-    }
-
-    participant.microphoneEnabled = enabled;
     return this.toSnapshot(room);
   }
 

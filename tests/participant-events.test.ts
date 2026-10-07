@@ -8,7 +8,6 @@ const host = {
   displayName: 'Host',
   role: 'host' as const,
   joinedAt: 1,
-  microphoneEnabled: false,
   presence: 'available' as const,
 };
 const guest = {
@@ -16,7 +15,6 @@ const guest = {
   displayName: 'Guest',
   role: 'guest' as const,
   joinedAt: 2,
-  microphoneEnabled: false,
   presence: 'available' as const,
 };
 const room: RoomSnapshot = {

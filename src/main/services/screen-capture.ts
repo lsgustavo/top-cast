@@ -32,6 +32,11 @@ export function configureScreenCapture(window: BrowserWindow): void {
   }
   handlersRegistered = true;
 
+  session.defaultSession.setPermissionCheckHandler(() => false);
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
+  });
+
   ipcMain.handle(LIST_SOURCES_CHANNEL, async (event): Promise<CaptureSource[]> => {
     if (!event.senderFrame || !isAuthorizedSender(event.sender, event.senderFrame)) {
       throw new Error('Unauthorized renderer requested desktop capture sources');
@@ -74,47 +79,6 @@ export function configureScreenCapture(window: BrowserWindow): void {
       return { ok: true };
     },
   );
-
-  const isAllowedMicrophoneRequest = (
-    webContents: Electron.WebContents | null,
-    origin: string | undefined,
-    isMainFrame: boolean,
-    mediaType: string | undefined,
-  ) => {
-    if (
-      !webContents ||
-      !activeWindow ||
-      activeWindow.isDestroyed() ||
-      webContents.id !== activeWindow.webContents.id ||
-      !isMainFrame ||
-      mediaType !== 'audio' ||
-      !origin
-    ) {
-      return false;
-    }
-    const rendererUrl = new URL(activeWindow.webContents.getURL());
-    if (rendererUrl.protocol === 'file:') {
-      return rendererUrl.pathname.toLowerCase().endsWith('/dist/index.html') &&
-        (origin === 'file://' || origin === 'null');
-    }
-    return rendererUrl.origin === 'http://localhost:4173' &&
-      origin === rendererUrl.origin;
-  };
-
-  session.defaultSession.setPermissionCheckHandler((webContents, permission, origin, details) =>
-    permission === 'media' &&
-    isAllowedMicrophoneRequest(webContents, origin, details.isMainFrame, details.mediaType),
-  );
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    const mediaTypes = 'mediaTypes' in details ? details.mediaTypes : undefined;
-    const securityOrigin = 'securityOrigin' in details ? details.securityOrigin : undefined;
-    callback(
-      permission === 'media' &&
-      mediaTypes?.length === 1 &&
-      mediaTypes[0] === 'audio' &&
-      isAllowedMicrophoneRequest(webContents, securityOrigin, true, 'audio'),
-    );
-  });
 
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     const source = selectedSourceId ? availableSources.get(selectedSourceId) : undefined;

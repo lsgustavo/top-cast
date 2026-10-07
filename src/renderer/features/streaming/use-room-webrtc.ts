@@ -33,14 +33,12 @@ export function useRoomWebRtc(
   socket: SignalingClient,
   room: RoomSnapshot | null,
   localStream: MediaStream | null,
-  microphoneStream: MediaStream | null,
 ) {
   const [connectionStates, setConnectionStates] = useState<Record<string, PeerConnectionStatus>>({});
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const peerConnectionsRef = useRef(new Map<string, RTCPeerConnection>());
   const videoSendersRef = useRef(new Map<string, RTCRtpSender>());
   const systemAudioSendersRef = useRef(new Map<string, RTCRtpSender>());
-  const microphoneSendersRef = useRef(new Map<string, RTCRtpSender>());
   const remoteStreamsRef = useRef(new Map<string, MediaStream>());
   const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>());
   const selfParticipantIdRef = useRef<string | null>(null);
@@ -279,7 +277,6 @@ export function useRoomWebRtc(
       peerConnectionsRef.current.clear();
       videoSendersRef.current.clear();
       systemAudioSendersRef.current.clear();
-      microphoneSendersRef.current.clear();
       pendingCandidatesRef.current.clear();
       remoteStreamsRef.current.clear();
       selfParticipantIdRef.current = null;
@@ -296,7 +293,6 @@ export function useRoomWebRtc(
       peerConnectionsRef.current.clear();
       videoSendersRef.current.clear();
       systemAudioSendersRef.current.clear();
-      microphoneSendersRef.current.clear();
       pendingCandidatesRef.current.clear();
       remoteStreamsRef.current.clear();
       setConnectionStates({});
@@ -320,7 +316,6 @@ export function useRoomWebRtc(
       peerConnectionsRef.current.clear();
       videoSendersRef.current.clear();
       systemAudioSendersRef.current.clear();
-      microphoneSendersRef.current.clear();
       pendingCandidatesRef.current.clear();
       remoteStreamsRef.current.clear();
       setConnectionStates({});
@@ -335,7 +330,6 @@ export function useRoomWebRtc(
         peerConnectionsRef.current.delete(peerId);
         videoSendersRef.current.delete(peerId);
         systemAudioSendersRef.current.delete(peerId);
-        microphoneSendersRef.current.delete(peerId);
         pendingCandidatesRef.current.delete(peerId);
         remoteStreamsRef.current.delete(peerId);
         setRemoteStreams((current) => {
@@ -389,20 +383,16 @@ export function useRoomWebRtc(
         peerConnectionsRef.current.set(participant.id, connection);
         const videoSender = connection.addTransceiver('video', { direction: 'sendonly' }).sender;
         const systemAudioSender = connection.addTransceiver('audio', { direction: 'sendonly' }).sender;
-        const microphoneSender = connection.addTransceiver('audio', { direction: 'sendonly' }).sender;
         videoSendersRef.current.set(participant.id, videoSender);
         systemAudioSendersRef.current.set(participant.id, systemAudioSender);
-        microphoneSendersRef.current.set(participant.id, microphoneSender);
         void negotiateHostConnection(
           socket,
           participant.id,
           connection,
           videoSender,
           systemAudioSender,
-          microphoneSender,
           localStream?.getVideoTracks()[0] ?? null,
           localStream?.getAudioTracks()[0] ?? null,
-          microphoneStream?.getAudioTracks()[0] ?? null,
           (status) => {
             setConnectionStates((current) => ({ ...current, [participant.id]: status }));
           },
@@ -413,7 +403,7 @@ export function useRoomWebRtc(
     return () => {
       cancelled = true;
     };
-  }, [room, socket, localStream, microphoneStream]);
+  }, [room, socket, localStream]);
 
   useEffect(() => {
     const videoTrack = localStream?.getVideoTracks()[0] ?? null;
@@ -433,15 +423,6 @@ export function useRoomWebRtc(
     }
   }, [localStream]);
 
-  useEffect(() => {
-    const microphoneTrack = microphoneStream?.getAudioTracks()[0] ?? null;
-    for (const [peerId, sender] of microphoneSendersRef.current) {
-      void sender.replaceTrack(microphoneTrack).catch(() => {
-        setConnectionStates((current) => ({ ...current, [peerId]: 'failed' }));
-      });
-    }
-  }, [microphoneStream]);
-
   return { connectionStates, remoteStreams };
 }
 
@@ -455,10 +436,8 @@ async function negotiateHostConnection(
   connection: RTCPeerConnection,
   videoSender: RTCRtpSender,
   systemAudioSender: RTCRtpSender,
-  microphoneSender: RTCRtpSender,
   videoTrack: MediaStreamTrack | null,
   systemAudioTrack: MediaStreamTrack | null,
-  microphoneTrack: MediaStreamTrack | null,
   updateStatus: (status: PeerConnectionStatus) => void,
 ): Promise<void> {
   connection.onicecandidate = (event) => {
@@ -542,7 +521,6 @@ async function negotiateHostConnection(
     await Promise.all([
       videoSender.replaceTrack(videoTrack),
       systemAudioSender.replaceTrack(systemAudioTrack),
-      microphoneSender.replaceTrack(microphoneTrack),
     ]);
     await sendHostOffer(socket, peerId, connection, false);
   } catch {

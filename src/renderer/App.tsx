@@ -8,7 +8,6 @@ import type { RoomAvailability, RoomSnapshot, SignalingStatus } from '../shared/
 import { createRoom as requestRoomCreation, joinRoom as requestRoomJoin } from './lib/room-client';
 import { useRoomWebRtc } from './features/streaming/use-room-webrtc';
 import { useScreenCapture } from './features/streaming/use-screen-capture';
-import { useMicrophone } from './features/streaming/use-microphone';
 import { getReconnectIdentity, type ReconnectIdentity } from './lib/reconnect-identity';
 import { getParticipantChanges } from './lib/participant-events';
 import { playPresenceSound } from './lib/presence-sound';
@@ -35,8 +34,6 @@ export default function App() {
   const [homeNotice, setHomeNotice] = useState('');
   const [signalingStatus, setSignalingStatus] = useState<SignalingStatus>('connected');
   const screenCapture = useScreenCapture();
-  const microphone = useMicrophone();
-  const [microphoneSyncError, setMicrophoneSyncError] = useState<string | null>(null);
   const roomRef = useRef(room);
   const hadSocketConnectionRef = useRef(false);
   const reconnectIdentityRef = useRef<ReconnectIdentity | null>(null);
@@ -73,29 +70,24 @@ export default function App() {
     socket,
     room,
     screenCapture.stream,
-    microphone.stream,
   );
 
   useEffect(() => {
-    if (!room && (screenCapture.stream || microphone.stream)) {
+    if (!room && screenCapture.stream) {
       screenCapture.stopCapture();
-      microphone.disable();
     }
-  }, [room, screenCapture.stream, screenCapture.stopCapture, microphone.stream, microphone.disable]);
+  }, [room, screenCapture.stream, screenCapture.stopCapture]);
 
   useEffect(() => {
     const self = room?.participants.find((participant) => participant.id === socket.id);
-    if (self?.role !== 'host' && (screenCapture.stream || microphone.stream)) {
+    if (self?.role !== 'host' && screenCapture.stream) {
       screenCapture.stopCapture();
-      microphone.disable();
     }
   }, [
     room,
     socket.id,
     screenCapture.stream,
     screenCapture.stopCapture,
-    microphone.stream,
-    microphone.disable,
   ]);
 
   useEffect(() => {
@@ -121,7 +113,6 @@ export default function App() {
       playPresenceSound('left');
       reconnectIdentityRef.current = null;
       screenCapture.stopCapture();
-      microphone.disable();
       setRoom(null);
       setPage('home');
       setHomeNotice(reason === 'expired' ? 'A sala expirou.' : 'O host encerrou a sala.');
@@ -129,7 +120,6 @@ export default function App() {
     const handleKicked = () => {
       reconnectIdentityRef.current = null;
       screenCapture.stopCapture();
-      microphone.disable();
       setRoom(null);
       setPage('home');
       setHomeNotice('O host removeu você da sala.');
@@ -146,7 +136,7 @@ export default function App() {
       socket.off('room:kicked', handleKicked);
       socket.disconnect();
     };
-  }, [socket, screenCapture.stopCapture, microphone.disable]);
+  }, [socket, screenCapture.stopCapture]);
 
   useEffect(() => {
     const removeShortcutListener = window.topCast?.onLeaveRoomShortcut(() => {
@@ -156,14 +146,13 @@ export default function App() {
       }
       reconnectIdentityRef.current = null;
       screenCapture.stopCapture();
-      microphone.disable();
       socket.emit('room:leave', () => undefined);
       setRoom(null);
       setPage('home');
       setHomeNotice('Você saiu da sala pelo atalho Ctrl+Shift+L.');
     });
     return () => removeShortcutListener?.();
-  }, [socket, screenCapture.stopCapture, microphone.disable]);
+  }, [socket, screenCapture.stopCapture]);
 
   useEffect(() => {
     const handleConnect = () => {
@@ -254,17 +243,6 @@ export default function App() {
     };
   }, [reconnectAttempt, socket]);
 
-  useEffect(() => {
-    if (!room || !socket.connected) {
-      return;
-    }
-    socket.emit('room:microphone', { enabled: microphone.isEnabled }, (result) => {
-      setMicrophoneSyncError(
-        result.ok ? null : 'Não foi possível atualizar o estado do microfone na sala.',
-      );
-    });
-  }, [microphone.isEnabled, room?.id, socket]);
-
   if (page === 'create-room') {
     return (
       <CreateRoomPage
@@ -310,7 +288,6 @@ export default function App() {
         signalingStatus={signalingStatus}
         connectionStates={connectionStates}
         localStream={screenCapture.stream}
-        microphoneStream={microphone.stream}
         remoteStreams={remoteStreams}
         captureSources={screenCapture.sources}
         isLoadingSources={screenCapture.isLoadingSources}
@@ -321,26 +298,18 @@ export default function App() {
         supportsSystemAudio={screenCapture.supportsSystemAudio}
         hasSystemAudio={screenCapture.hasSystemAudio}
         systemAudioEnabled={screenCapture.systemAudioEnabled}
-        isMicrophoneEnabled={microphone.isEnabled}
-        isMicrophoneStarting={microphone.isStarting}
-        microphoneDeviceId={microphone.deviceId}
         captureError={screenCapture.error}
-        microphoneError={microphone.error ?? microphoneSyncError}
         onLoadSources={screenCapture.loadSources}
         onPrepareSource={screenCapture.prepareSource}
         onStartCapture={screenCapture.startCapture}
         onStopCapture={screenCapture.stopCapture}
         onToggleSystemAudio={screenCapture.setSystemAudioEnabled}
-        onToggleMicrophone={microphone.toggle}
-        onSelectMicrophoneDevice={microphone.selectDevice}
-        onDisableMicrophone={microphone.disable}
         onLeaveRequested={() => {
           reconnectIdentityRef.current = null;
         }}
         onLeave={() => {
           reconnectIdentityRef.current = null;
           screenCapture.stopCapture();
-          microphone.disable();
           setRoom(null);
           setPage('home');
         }}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Check, CircleAlert, Copy, Crown, LogOut, Mic, MicOff, Settings, Volume2, VolumeX } from 'lucide-react';
+import { AlertTriangle, Check, CircleAlert, Copy, Crown, LogOut, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select';
 import {
@@ -25,7 +25,6 @@ interface RoomPageProps {
   signalingStatus: SignalingStatus;
   connectionStates: Record<string, PeerConnectionStatus>;
   localStream: MediaStream | null;
-  microphoneStream: MediaStream | null;
   remoteStreams: Record<string, MediaStream>;
   captureSources: CaptureSource[];
   isLoadingSources: boolean;
@@ -36,19 +35,12 @@ interface RoomPageProps {
   supportsSystemAudio: boolean;
   hasSystemAudio: boolean;
   systemAudioEnabled: boolean;
-  isMicrophoneEnabled: boolean;
-  isMicrophoneStarting: boolean;
-  microphoneDeviceId: string;
   captureError: string | null;
-  microphoneError: string | null;
   onLoadSources: () => Promise<CaptureSource[]>;
   onPrepareSource: (sourceId: string | null, includeSystemAudio?: boolean) => Promise<boolean>;
   onStartCapture: () => Promise<boolean>;
   onStopCapture: () => void;
   onToggleSystemAudio: (enabled: boolean) => void;
-  onToggleMicrophone: () => Promise<boolean>;
-  onSelectMicrophoneDevice: (deviceId: string) => Promise<void>;
-  onDisableMicrophone: () => void;
   onLeaveRequested: () => void;
   onLeave: () => void;
 }
@@ -88,58 +80,6 @@ function ScreenIcon({ className = 'h-5 w-5' }: { className?: string }) {
   );
 }
 
-function AudioLevel({ stream, enabled }: { stream: MediaStream | null; enabled: boolean }) {
-  const [level, setLevel] = useState(0);
-
-  useEffect(() => {
-    if (!enabled || !stream) {
-      setLevel(0);
-      return;
-    }
-
-    const context = new AudioContext();
-    const source = context.createMediaStreamSource(stream);
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 256;
-    source.connect(analyser);
-    const samples = new Uint8Array(analyser.fftSize);
-    let frame = 0;
-    let active = true;
-
-    const update = () => {
-      if (!active) return;
-      analyser.getByteTimeDomainData(samples);
-      let sum = 0;
-      for (const sample of samples) {
-        const normalized = (sample - 128) / 128;
-        sum += normalized * normalized;
-      }
-      setLevel(Math.min(100, Math.round(Math.sqrt(sum / samples.length) * 250)));
-      frame = window.requestAnimationFrame(update);
-    };
-
-    update();
-    return () => {
-      active = false;
-      window.cancelAnimationFrame(frame);
-      source.disconnect();
-      analyser.disconnect();
-      void context.close();
-    };
-  }, [enabled, stream]);
-
-  return (
-    <div className="flex h-1.5 flex-1 gap-0.5 overflow-hidden rounded-full bg-slate-800" role="meter" aria-label="Nível de entrada do microfone" aria-valuemin={0} aria-valuemax={100} aria-valuenow={level}>
-      {Array.from({ length: 20 }, (_, index) => (
-        <span
-          key={index}
-          className={`h-full flex-1 rounded-full transition-colors ${level >= (index + 1) * 5 ? 'bg-emerald-400' : 'bg-transparent'}`}
-        />
-      ))}
-    </div>
-  );
-}
-
 export default function RoomPage({
   room,
   socket,
@@ -147,7 +87,6 @@ export default function RoomPage({
   signalingStatus,
   connectionStates,
   localStream,
-  microphoneStream,
   remoteStreams,
   captureSources,
   isLoadingSources,
@@ -158,19 +97,12 @@ export default function RoomPage({
   supportsSystemAudio,
   hasSystemAudio,
   systemAudioEnabled,
-  isMicrophoneEnabled,
-  isMicrophoneStarting,
-  microphoneDeviceId,
   captureError,
-  microphoneError,
   onLoadSources,
   onPrepareSource,
   onStartCapture,
   onStopCapture,
   onToggleSystemAudio,
-  onToggleMicrophone,
-  onSelectMicrophoneDevice,
-  onDisableMicrophone,
   onLeaveRequested,
   onLeave,
 }: RoomPageProps) {
@@ -178,9 +110,6 @@ export default function RoomPage({
   const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
   const [isCopied, setIsCopied] = useState(false);
   const [participantActionError, setParticipantActionError] = useState('');
-  const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
-  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
-  const [audioSettingsError, setAudioSettingsError] = useState('');
   const [isLeaving, setIsLeaving] = useState(false);
   const [now, setNow] = useState(Date.now());
   const toastTimerRef = useRef<number | null>(null);
@@ -201,7 +130,9 @@ export default function RoomPage({
     restoring: 'Restaurando sala…',
   };
   const rtcConnectedCount = Object.values(connectionStates).filter((status) => status === 'connected').length;
-  const isVoiceConnected = signalingStatus === 'connected' && (isMicrophoneEnabled || rtcConnectedCount > 0);
+  const isRoomConnected = signalingStatus === 'connected' && (
+    room.participants.length <= 1 || rtcConnectedCount > 0
+  );
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 15_000);
@@ -234,22 +165,6 @@ export default function RoomPage({
       setToastMessage('');
       setIsCopied(false);
     }, duration);
-  }
-
-  async function openAudioSettings() {
-    setAudioSettingsError('');
-    setAudioSettingsOpen(true);
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      setAudioInputDevices(devices.filter((device) => device.kind === 'audioinput'));
-    } catch (error) {
-      setAudioSettingsError(error instanceof Error ? error.message : 'Não foi possível carregar os dispositivos de áudio.');
-    }
-  }
-
-  async function handleAudioDeviceChange(deviceId: string) {
-    setAudioSettingsError('');
-    await onSelectMicrophoneDevice(deviceId);
   }
 
   function handlePresenceChange(value: string) {
@@ -315,7 +230,6 @@ export default function RoomPage({
     setIsLeaving(true);
     onLeaveRequested();
     onStopCapture();
-    onDisableMicrophone();
     socket.emit('room:leave', () => onLeave());
   }
 
@@ -426,27 +340,16 @@ export default function RoomPage({
         </section>
 
         <div className="mt-4 border-t border-slate-800 pt-3 lg:mt-3">
-          <section aria-label="Controles de voz" className="rounded-lg border border-slate-700/50 bg-slate-900/70 p-2.5">
+          <section aria-label="Áudio da transmissão" className="rounded-lg border border-slate-700/50 bg-slate-900/70 p-2.5">
             <div className="flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-300">
-                <span className={`h-1.5 w-1.5 rounded-full ${isVoiceConnected ? 'bg-emerald-400' : 'bg-amber-300'}`} />
-                {isVoiceConnected ? 'Voz conectada · RTC OK' : 'Voz em espera'}
+                <span className={`h-1.5 w-1.5 rounded-full ${isRoomConnected ? 'bg-emerald-400' : 'bg-amber-300'}`} />
+                {isRoomConnected
+                  ? rtcConnectedCount > 0 ? 'Sala conectada · RTC OK' : 'Sinalização conectada'
+                  : signalingStatusLabels[signalingStatus]}
               </span>
-              <AudioLevel stream={microphoneStream} enabled={isMicrophoneEnabled} />
             </div>
             <div className="mt-2.5 flex items-center justify-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={isMicrophoneEnabled ? 'Desativar microfone' : 'Ativar microfone'}
-                aria-pressed={isMicrophoneEnabled}
-                disabled={isMicrophoneStarting}
-                onClick={() => void onToggleMicrophone()}
-                className={`h-9 w-9 rounded-full ${isMicrophoneEnabled ? 'bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25' : 'bg-red-400/20 text-red-300 hover:bg-red-400/30'}`}
-              >
-                {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-              </Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -459,24 +362,7 @@ export default function RoomPage({
               >
                 {systemAudioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Configurações de áudio"
-                title="Configurações de áudio"
-                onClick={() => void openAudioSettings()}
-                className="h-9 w-9 rounded-full text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
             </div>
-            {microphoneError && (
-              <p role="alert" className="mt-2 inline-flex w-fit max-w-full items-start gap-2 break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2 py-1.5 text-xs leading-5 text-red-200">
-                <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                {microphoneError}
-              </p>
-            )}
             {!supportsSystemAudio && (
               <p className="mt-2 text-center text-[10px] leading-4 text-slate-500">Áudio do sistema indisponível nesta plataforma.</p>
             )}
@@ -636,55 +522,6 @@ export default function RoomPage({
 
         </div>
       </div>
-
-      {audioSettingsOpen && (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="audio-settings-title"
-            className="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 id="audio-settings-title" className="text-base font-semibold text-slate-100">Configurações de áudio</h2>
-                <p className="mt-1 text-xs leading-5 text-slate-400">Escolha o microfone que será usado nesta sala.</p>
-              </div>
-              <Button type="button" variant="ghost" size="icon" aria-label="Fechar configurações de áudio" onClick={() => setAudioSettingsOpen(false)} className="h-8 w-8">
-                <span aria-hidden="true" className="text-lg leading-none">×</span>
-              </Button>
-            </div>
-            <label className="mt-5 block text-xs font-medium text-slate-300" id="audio-input-label">Microfone</label>
-            <Select
-              value={microphoneDeviceId || 'default'}
-              onValueChange={(deviceId) => void handleAudioDeviceChange(deviceId === 'default' ? '' : deviceId)}
-            >
-              <SelectTrigger aria-labelledby="audio-input-label" className="mt-2 w-full">
-                <span className="min-w-0 flex-1 truncate">
-                  {audioInputDevices.find((device) => device.deviceId === microphoneDeviceId)?.label || 'Dispositivo padrão'}
-                </span>
-              </SelectTrigger>
-              <SelectContent position="popper" className="w-[var(--radix-select-trigger-width)]">
-                <SelectItem value="default">Dispositivo padrão</SelectItem>
-                {audioInputDevices.filter((device) => device.deviceId).map((device, index) => (
-                  <SelectItem key={device.deviceId} value={device.deviceId}>
-                    {device.label || `Microfone ${index + 1}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {audioSettingsError && (
-              <p role="alert" className="mt-3 inline-flex w-fit max-w-full items-start gap-2 break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2.5 py-2 text-xs leading-5 text-red-200">
-                <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                {audioSettingsError}
-              </p>
-            )}
-            <div className="mt-5 flex justify-end">
-              <Button type="button" variant="secondary" size="sm" onClick={() => setAudioSettingsOpen(false)}>Concluído</Button>
-            </div>
-          </section>
-        </div>
-      )}
 
       {isSourcePickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">

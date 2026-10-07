@@ -13,8 +13,8 @@ Já existem:
 - fluxos para criar e entrar em salas;
 - signaling Socket.IO e salas em memória com convites de 24 horas e limite de
   dez participantes;
-- conexões WebRTC host-para-participantes, captura de tela/janela, microfone
-  opcional e captura opcional do áudio de saída do Windows;
+- conexões WebRTC host-para-participantes, captura de tela/janela e captura
+  opcional do áudio de saída do Windows;
 - reconexão básica, testes unitários do serviço de salas e validação de payloads;
 - build Windows NSIS e instalador gerável por script.
 
@@ -28,7 +28,7 @@ nem distribuição pronta para usuários.
 - criar/entrar/sair de uma sala privada de até dez pessoas;
 - transmitir a tela ou uma janela a até nove espectadores;
 - vídeo inicial até 720p/30 FPS;
-- microfone desligado por padrão e áudio do sistema opcional;
+- microfone não capturado nem transmitido; áudio do sistema opcional;
 - comunicação entre redes diferentes usando signaling publicado em HTTPS/WSS e
   TURN configurado;
 - mensagens compreensíveis para falhas de conexão e captura;
