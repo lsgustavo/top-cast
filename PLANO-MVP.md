@@ -52,6 +52,17 @@ Cada etapa de implementação deve ser validada antes de ser considerada conclu�
 e receber um commit próprio. Não incluir mudanças preexistentes ou arquivos
 alheios ao escopo nesses commits.
 
+## Funcionalidades incrementais solicitadas
+
+- [x] Atualizar serviço para sala global única, convite de seis caracteres,
+  estado global em tempo real, expulsão e transferência de host em desconexão.
+- [ ] Solicitar nome de exibição na tela inicial e refletir disponibilidade
+  global no botão de criar sala.
+- [ ] Adicionar timer de expiração, feedback de cópia, badges/avatar local,
+  presença e sons de entrada/saída.
+- [ ] Adicionar atalho global e notificação nativa por novo participante.
+- [ ] Cobrir todas as funções com testes e commits isolados.
+
 ### Etapa 1 — Plano e critérios de aceite
 
 - [x] Registrar estado atual, escopo, limitações e etapas restantes neste arquivo.

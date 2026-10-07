@@ -27,6 +27,11 @@ export interface RoomParticipant {
   role: 'host' | 'guest';
   joinedAt: number;
   microphoneEnabled: boolean;
+  presence: 'available' | 'away' | 'busy';
+}
+
+export interface RoomAvailability {
+  active: boolean;
 }
 
 export interface RoomSnapshot {
@@ -38,6 +43,7 @@ export interface RoomSnapshot {
 }
 
 export type RoomErrorCode =
+  | 'ROOM_EXISTS'
   | 'INVALID_CODE'
   | 'ROOM_EXPIRED'
   | 'ROOM_FULL'
@@ -70,6 +76,18 @@ export type MicrophoneStateResult =
 export interface RoomClosedMessage {
   reason: 'host-left' | 'expired';
 }
+
+export interface ParticipantKickedMessage {
+  reason: 'removed-by-host';
+}
+
+export type KickParticipantResult =
+  | { ok: true }
+  | { ok: false; error: 'NOT_HOST' | 'NOT_IN_ROOM' | 'INVALID_PARTICIPANT' };
+
+export type PresenceStateResult =
+  | { ok: true }
+  | { ok: false; error: 'NOT_IN_ROOM' | 'INVALID_STATE' };
 
 export interface WebRtcDescriptionPayload {
   toParticipantId: string;
@@ -104,8 +122,10 @@ export type WebRtcSignalResult = { ok: true } | { ok: false; error: WebRtcSignal
 
 export interface ServerToClientEvents {
   'server:ready': (message: ServerReadyMessage) => void;
+  'room:availability': (availability: RoomAvailability) => void;
   'room:updated': (room: RoomSnapshot) => void;
   'room:closed': (message: RoomClosedMessage) => void;
+  'room:kicked': (message: ParticipantKickedMessage) => void;
   'webrtc:description': (message: WebRtcDescriptionMessage) => void;
   'webrtc:ice-candidate': (message: WebRtcIceCandidateMessage) => void;
 }
@@ -122,6 +142,14 @@ export interface ClientToServerEvents {
     acknowledge: (result: RoomOperationResult) => void,
   ) => void;
   'room:leave': (acknowledge: (result: LeaveRoomResponse) => void) => void;
+  'room:kick': (
+    payload: { participantId: string },
+    acknowledge: (result: KickParticipantResult) => void,
+  ) => void;
+  'room:presence': (
+    payload: { presence: RoomParticipant['presence'] },
+    acknowledge: (result: PresenceStateResult) => void,
+  ) => void;
   'room:microphone': (
     payload: { enabled: boolean },
     acknowledge: (result: MicrophoneStateResult) => void,

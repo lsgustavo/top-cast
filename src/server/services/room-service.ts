@@ -8,7 +8,7 @@ import type {
 } from '../../shared/types/signaling.js';
 
 const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const INVITE_CODE_LENGTH = 8;
+const INVITE_CODE_LENGTH = 6;
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const EXPIRED_CODE_RETENTION_MS = ROOM_TTL_MS;
 const MAX_PARTICIPANTS = 10;
@@ -25,6 +25,8 @@ interface Room {
 interface LeaveResult {
   roomId: string;
   roomClosed: boolean;
+  hostTransferred: boolean;
+  removedParticipantId?: string;
   snapshot?: RoomSnapshot;
 }
 
@@ -37,6 +39,9 @@ export class RoomService {
   create(socketId: string, rawName: unknown, now = Date.now()): RoomOperationResult {
     if (this.roomIdsBySocketId.has(socketId)) {
       return { ok: false, error: 'ALREADY_IN_ROOM' };
+    }
+    if (this.roomsById.size > 0) {
+      return { ok: false, error: 'ROOM_EXISTS' };
     }
 
     const displayName = this.validateName(rawName);
@@ -57,6 +62,7 @@ export class RoomService {
       role: 'host',
       joinedAt: now,
       microphoneEnabled: false,
+      presence: 'available',
     };
 
     room.participants.set(socketId, participant);
@@ -117,6 +123,7 @@ export class RoomService {
       role: 'guest',
       joinedAt: now,
       microphoneEnabled: false,
+      presence: 'available',
     };
     room.participants.set(socketId, participant);
     this.roomIdsBySocketId.set(socketId, room.id);
@@ -124,7 +131,7 @@ export class RoomService {
     return { ok: true, room: this.toSnapshot(room) };
   }
 
-  leave(socketId: string, now = Date.now()): LeaveResult | undefined {
+  leave(socketId: string, now = Date.now(), transferHost = false): LeaveResult | undefined {
     const roomId = this.roomIdsBySocketId.get(socketId);
     if (!roomId) {
       return undefined;
@@ -137,12 +144,79 @@ export class RoomService {
     }
 
     if (room.hostSocketId === socketId) {
+      room.participants.delete(socketId);
+      if (transferHost && room.participants.size > 0) {
+        const nextHost = Array.from(room.participants.values())
+          .sort((first, second) => first.joinedAt - second.joinedAt)[0];
+        if (nextHost) {
+          nextHost.role = 'host';
+          room.hostSocketId = nextHost.id;
+          return {
+            roomId,
+            roomClosed: false,
+            hostTransferred: true,
+            removedParticipantId: socketId,
+            snapshot: this.toSnapshot(room),
+          };
+        }
+      }
       this.closeRoom(room);
-      return { roomId, roomClosed: true };
+      return { roomId, roomClosed: true, hostTransferred: false, removedParticipantId: socketId };
     }
 
     room.participants.delete(socketId);
-    return { roomId, roomClosed: false, snapshot: this.toSnapshot(room) };
+    return {
+      roomId,
+      roomClosed: false,
+      hostTransferred: false,
+      removedParticipantId: socketId,
+      snapshot: this.toSnapshot(room),
+    };
+  }
+
+  getAvailability(): { active: boolean } {
+    return { active: this.roomsById.size > 0 };
+  }
+
+  getParticipantRole(socketId: string): RoomParticipant['role'] | undefined {
+    const roomId = this.roomIdsBySocketId.get(socketId);
+    const room = roomId ? this.roomsById.get(roomId) : undefined;
+    return room?.participants.get(socketId)?.role;
+  }
+
+  kick(hostSocketId: string, participantId: unknown): LeaveResult | undefined {
+    const roomId = this.roomIdsBySocketId.get(hostSocketId);
+    const room = roomId ? this.roomsById.get(roomId) : undefined;
+    if (!room || room.hostSocketId !== hostSocketId || typeof participantId !== 'string') {
+      return undefined;
+    }
+    if (participantId === hostSocketId || !room.participants.has(participantId)) {
+      return undefined;
+    }
+
+    room.participants.delete(participantId);
+    this.roomIdsBySocketId.delete(participantId);
+    return {
+      roomId: room.id,
+      roomClosed: false,
+      hostTransferred: false,
+      removedParticipantId: participantId,
+      snapshot: this.toSnapshot(room),
+    };
+  }
+
+  setPresence(socketId: string, presence: unknown): RoomSnapshot | undefined {
+    if (presence !== 'available' && presence !== 'away' && presence !== 'busy') {
+      return undefined;
+    }
+    const roomId = this.roomIdsBySocketId.get(socketId);
+    const room = roomId ? this.roomsById.get(roomId) : undefined;
+    const participant = room?.participants.get(socketId);
+    if (!room || !participant) {
+      return undefined;
+    }
+    participant.presence = presence;
+    return this.toSnapshot(room);
   }
 
   setMicrophoneEnabled(socketId: string, enabled: boolean): RoomSnapshot | undefined {
@@ -216,6 +290,9 @@ export class RoomService {
   }
 
   private createInviteCode(): string {
+    if (this.roomsById.size > 0) {
+      throw new Error('Only one active room is allowed');
+    }
     for (let attempt = 0; attempt < 10; attempt += 1) {
       const code = Array.from(
         { length: INVITE_CODE_LENGTH },
@@ -245,7 +322,7 @@ export class RoomService {
   private toSnapshot(room: Room): RoomSnapshot {
     return {
       id: room.id,
-      inviteCode: `${room.inviteCode.slice(0, 4)}-${room.inviteCode.slice(4)}`,
+      inviteCode: `${room.inviteCode.slice(0, 3)}-${room.inviteCode.slice(3)}`,
       expiresAt: room.expiresAt,
       participants: Array.from(room.participants.values()),
       maxParticipants: MAX_PARTICIPANTS,
@@ -255,6 +332,7 @@ export class RoomService {
 
 export function isRoomErrorCode(value: string): value is RoomErrorCode {
   return [
+    'ROOM_EXISTS',
     'INVALID_CODE',
     'ROOM_EXPIRED',
     'ROOM_FULL',

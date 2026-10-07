@@ -13,11 +13,12 @@ describe('RoomService', () => {
     assert.equal(result.ok, true);
     if (!result.ok) return;
 
-    assert.match(result.room.inviteCode, /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    assert.match(result.room.inviteCode, /^[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{3}$/);
     assert.equal(result.room.expiresAt, now + DAY_MS);
     assert.equal(result.room.maxParticipants, 10);
     assert.equal(result.room.participants.length, 1);
     assert.equal(result.room.participants[0]?.role, 'host');
+    assert.equal(result.room.participants[0]?.presence, 'available');
   });
 
   it('accepts valid guests and enforces the ten-participant limit', () => {
@@ -38,6 +39,20 @@ describe('RoomService', () => {
       service.join('guest-overflow', created.room.inviteCode, 'Overflow', 40),
       { ok: false, error: 'ROOM_FULL' },
     );
+  });
+
+  it('allows only one active room globally and reports availability', () => {
+    const service = new RoomService();
+    assert.deepEqual(service.getAvailability(), { active: false });
+    const firstRoom = service.create('host-1', 'Host 1', 1);
+    assert.equal(firstRoom.ok, true);
+    assert.deepEqual(service.getAvailability(), { active: true });
+    assert.deepEqual(service.create('host-2', 'Host 2', 2), { ok: false, error: 'ROOM_EXISTS' });
+
+    if (!firstRoom.ok) return;
+    service.leave('host-1', 3);
+    assert.deepEqual(service.getAvailability(), { active: false });
+    assert.equal(service.create('host-2', 'Host 2', 4).ok, true);
   });
 
   it('rejects missing, malformed, and expired invitation codes distinctly', () => {
@@ -104,6 +119,46 @@ describe('RoomService', () => {
     );
   });
 
+  it('transfers host to the oldest remaining participant after an unexpected disconnect', () => {
+    const service = new RoomService();
+    const created = service.create('host', 'Host', 100);
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+    const firstGuest = service.join('guest-1', created.room.inviteCode, 'Guest 1', 110);
+    assert.equal(firstGuest.ok, true);
+    const secondGuest = service.join('guest-2', created.room.inviteCode, 'Guest 2', 120);
+    assert.equal(secondGuest.ok, true);
+
+    const transfer = service.leave('host', 130, true);
+    assert.equal(transfer?.roomClosed, false);
+    assert.equal(transfer?.hostTransferred, true);
+    assert.equal(transfer?.snapshot?.participants.find((person) => person.id === 'guest-1')?.role, 'host');
+    assert.equal(transfer?.snapshot?.participants.find((person) => person.id === 'guest-2')?.role, 'guest');
+    assert.equal(service.authorizeSignal('guest-1', 'guest-2', 'offer'), undefined);
+    assert.deepEqual(service.getAvailability(), { active: true });
+  });
+
+  it('lets the host remove a participant and tracks valid presence states', () => {
+    const service = new RoomService();
+    const created = service.create('host', 'Host', 100);
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+    const joined = service.join('guest', created.room.inviteCode, 'Guest', 110);
+    assert.equal(joined.ok, true);
+    if (!joined.ok) return;
+
+    assert.equal(service.getParticipantRole('guest'), 'guest');
+    assert.equal(service.setPresence('guest', 'busy')?.participants[1]?.presence, 'busy');
+    assert.equal(service.setPresence('guest', 'unknown'), undefined);
+    assert.equal(service.setPresence('outsider', 'away'), undefined);
+
+    const removed = service.kick('host', 'guest');
+    assert.equal(removed?.removedParticipantId, 'guest');
+    assert.equal(removed?.snapshot?.participants.length, 1);
+    assert.equal(service.getParticipantRole('guest'), undefined);
+    assert.equal(service.kick('guest', 'host'), undefined);
+  });
+
   it('closes rooms at expiry and keeps a temporary expired-code response', () => {
     const service = new RoomService();
     const created = service.create('host', 'Host', 500);
@@ -132,7 +187,7 @@ describe('RoomService', () => {
     assert.equal(joined.ok, true);
     if (!joined.ok) return;
     const otherRoom = service.create('other-host', 'Other host', 120);
-    assert.equal(otherRoom.ok, true);
+    assert.deepEqual(otherRoom, { ok: false, error: 'ROOM_EXISTS' });
 
     assert.equal(service.authorizeSignal('host', 'guest', 'offer'), undefined);
     assert.equal(service.authorizeSignal('guest', 'host', 'answer'), undefined);

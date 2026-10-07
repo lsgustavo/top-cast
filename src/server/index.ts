@@ -6,9 +6,11 @@ import { createIceServerConfiguration, loadTurnConfiguration } from './services/
 import {
   SIGNALING_PROTOCOL_VERSION,
   type ClientToServerEvents,
+  type KickParticipantResult,
   type IceServersResult,
   type InterServerEvents,
   type MicrophoneStateResult,
+  type PresenceStateResult,
   type ServerToClientEvents,
   type SignalingSocketData,
 } from '../shared/types/signaling.js';
@@ -65,6 +67,7 @@ io.on('connection', (socket) => {
   app.log.info({ socketId: socket.id }, 'Signaling client connected');
 
   socket.emit('server:ready', { protocolVersion: SIGNALING_PROTOCOL_VERSION });
+  socket.emit('room:availability', roomService.getAvailability());
 
   let iceRequestWindowStartedAt = 0;
   let iceRequestsInWindow = 0;
@@ -125,6 +128,7 @@ io.on('connection', (socket) => {
       await socket.join(result.room.id);
       acknowledge(result);
       io.to(result.room.id).emit('room:updated', result.room);
+      io.emit('room:availability', roomService.getAvailability());
     } catch (error) {
       app.log.error({ error, socketId: socket.id }, 'Failed to create room');
       acknowledge({ ok: false, error: 'SERVER_ERROR' });
@@ -181,12 +185,61 @@ io.on('connection', (socket) => {
       closeRoomSockets(result.roomId);
       io.to(result.roomId).emit('room:closed', { reason: 'host-left' });
       io.in(result.roomId).socketsLeave(result.roomId);
+      io.emit('room:availability', roomService.getAvailability());
     } else if (result.snapshot) {
       io.to(result.roomId).emit('room:updated', result.snapshot);
       void socket.leave(result.roomId);
     }
 
     acknowledge({ ok: true });
+  });
+
+  socket.on('room:kick', (payload, acknowledge) => {
+    if (typeof acknowledge !== 'function') {
+      app.log.warn({ socketId: socket.id }, 'Rejected room:kick without acknowledgment callback');
+      return;
+    }
+
+    let result: KickParticipantResult;
+    if (!socket.data.roomId || roomService.getParticipantRole(socket.id) !== 'host') {
+      result = { ok: false, error: 'NOT_HOST' };
+    } else {
+      const leaveResult = roomService.kick(socket.id, payload?.participantId);
+      if (!leaveResult || !leaveResult.removedParticipantId || !leaveResult.snapshot) {
+        result = { ok: false, error: 'INVALID_PARTICIPANT' };
+      } else {
+        const removedSocket = io.sockets.sockets.get(leaveResult.removedParticipantId);
+        if (removedSocket) {
+          removedSocket.data.roomId = undefined;
+          removedSocket.data.participantId = undefined;
+          removedSocket.emit('room:kicked', { reason: 'removed-by-host' });
+          void removedSocket.leave(leaveResult.roomId);
+        }
+        io.to(leaveResult.roomId).emit('room:updated', leaveResult.snapshot);
+        result = { ok: true };
+      }
+    }
+    acknowledge(result);
+  });
+
+  socket.on('room:presence', (payload, acknowledge) => {
+    if (typeof acknowledge !== 'function') {
+      app.log.warn({ socketId: socket.id }, 'Rejected room:presence without acknowledgment callback');
+      return;
+    }
+
+    let result: PresenceStateResult;
+    const snapshot = roomService.setPresence(socket.id, payload?.presence);
+    if (!snapshot) {
+      result = {
+        ok: false,
+        error: socket.data.roomId ? 'INVALID_STATE' : 'NOT_IN_ROOM',
+      };
+    } else {
+      io.to(snapshot.id).emit('room:updated', snapshot);
+      result = { ok: true };
+    }
+    acknowledge(result);
   });
 
   socket.on('room:microphone', (payload, acknowledge) => {
@@ -276,11 +329,12 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', (reason) => {
-    const result = roomService.leave(socket.id);
+    const result = roomService.leave(socket.id, Date.now(), true);
     if (result?.roomClosed) {
       closeRoomSockets(result.roomId);
       io.to(result.roomId).emit('room:closed', { reason: 'host-left' });
       io.in(result.roomId).socketsLeave(result.roomId);
+      io.emit('room:availability', roomService.getAvailability());
     } else if (result?.snapshot) {
       io.to(result.roomId).emit('room:updated', result.snapshot);
     }
@@ -321,10 +375,14 @@ const roomExpiryTimer = setInterval(() => {
     }
   }
 
-  for (const roomId of roomService.expireRooms(now)) {
+  const expiredRoomIds = roomService.expireRooms(now);
+  for (const roomId of expiredRoomIds) {
     closeRoomSockets(roomId);
     io.to(roomId).emit('room:closed', { reason: 'expired' });
     io.in(roomId).socketsLeave(roomId);
+  }
+  if (expiredRoomIds.length > 0) {
+    io.emit('room:availability', roomService.getAvailability());
   }
 }, 60_000);
 roomExpiryTimer.unref();
