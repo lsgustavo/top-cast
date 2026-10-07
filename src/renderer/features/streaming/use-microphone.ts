@@ -4,7 +4,9 @@ export function useMicrophone() {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deviceId, setDeviceId] = useState('');
   const streamRef = useRef<MediaStream | null>(null);
+  const deviceIdRef = useRef('');
 
   const disable = useCallback(() => {
     const currentStream = streamRef.current;
@@ -24,6 +26,7 @@ export function useMicrophone() {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          ...(deviceIdRef.current ? { deviceId: { exact: deviceIdRef.current } } : {}),
         },
         video: false,
       });
@@ -63,6 +66,16 @@ export function useMicrophone() {
     return enable();
   }, [disable, enable]);
 
+  const selectDevice = useCallback(async (nextDeviceId: string) => {
+    const wasEnabled = streamRef.current !== null;
+    deviceIdRef.current = nextDeviceId;
+    setDeviceId(nextDeviceId);
+    if (wasEnabled) {
+      disable();
+      await enable();
+    }
+  }, [disable, enable]);
+
   useEffect(() => () => {
     const currentStream = streamRef.current;
     streamRef.current = null;
@@ -74,7 +87,9 @@ export function useMicrophone() {
     isEnabled: stream !== null,
     isStarting,
     error,
+    deviceId,
     toggle,
     disable,
+    selectDevice,
   };
 }

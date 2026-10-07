@@ -26,7 +26,7 @@ const SelectContent = ({ className, children, position = 'popper', ...props }: S
     <SelectPrimitive.Content
       position={position}
       className={cn(
-        'z-[70] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-slate-700 bg-slate-900 p-1 text-slate-200 shadow-xl',
+        'z-[85] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-slate-700 bg-slate-900 p-1 text-slate-200 shadow-xl',
         className,
       )}
       {...props}

@@ -308,7 +308,9 @@ export default function App() {
           null
         }
         signalingStatus={signalingStatus}
+        connectionStates={connectionStates}
         localStream={screenCapture.stream}
+        microphoneStream={microphone.stream}
         remoteStreams={remoteStreams}
         captureSources={screenCapture.sources}
         isLoadingSources={screenCapture.isLoadingSources}
@@ -321,6 +323,7 @@ export default function App() {
         systemAudioEnabled={screenCapture.systemAudioEnabled}
         isMicrophoneEnabled={microphone.isEnabled}
         isMicrophoneStarting={microphone.isStarting}
+        microphoneDeviceId={microphone.deviceId}
         captureError={screenCapture.error}
         microphoneError={microphone.error ?? microphoneSyncError}
         onLoadSources={screenCapture.loadSources}
@@ -329,6 +332,7 @@ export default function App() {
         onStopCapture={screenCapture.stopCapture}
         onToggleSystemAudio={screenCapture.setSystemAudioEnabled}
         onToggleMicrophone={microphone.toggle}
+        onSelectMicrophoneDevice={microphone.selectDevice}
         onDisableMicrophone={microphone.disable}
         onLeaveRequested={() => {
           reconnectIdentityRef.current = null;

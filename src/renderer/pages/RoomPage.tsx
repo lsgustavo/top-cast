@@ -1,18 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
+import { Check, Copy, Crown, LogOut, Mic, MicOff, Settings, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '../components/ui/alert-dialog';
 import { formatRoomTimeRemaining, getParticipantAvatarHue, getParticipantInitials } from '../lib/room-ui';
 import type { RoomSnapshot } from '../../shared/types/signaling';
 import type { CaptureSource } from '../../shared/types/desktop-api';
 import type { SignalingStatus } from '../../shared/types/signaling';
 import type { SignalingClient } from '../lib/signaling-client';
+import type { PeerConnectionStatus } from '../features/streaming/use-room-webrtc';
 
 interface RoomPageProps {
   room: RoomSnapshot;
   socket: SignalingClient;
   selfParticipantId: string | null;
   signalingStatus: SignalingStatus;
+  connectionStates: Record<string, PeerConnectionStatus>;
   localStream: MediaStream | null;
+  microphoneStream: MediaStream | null;
   remoteStreams: Record<string, MediaStream>;
   captureSources: CaptureSource[];
   isLoadingSources: boolean;
@@ -25,6 +38,7 @@ interface RoomPageProps {
   systemAudioEnabled: boolean;
   isMicrophoneEnabled: boolean;
   isMicrophoneStarting: boolean;
+  microphoneDeviceId: string;
   captureError: string | null;
   microphoneError: string | null;
   onLoadSources: () => Promise<CaptureSource[]>;
@@ -33,6 +47,7 @@ interface RoomPageProps {
   onStopCapture: () => void;
   onToggleSystemAudio: (enabled: boolean) => void;
   onToggleMicrophone: () => Promise<boolean>;
+  onSelectMicrophoneDevice: (deviceId: string) => Promise<void>;
   onDisableMicrophone: () => void;
   onLeaveRequested: () => void;
   onLeave: () => void;
@@ -73,12 +88,66 @@ function ScreenIcon({ className = 'h-5 w-5' }: { className?: string }) {
   );
 }
 
+function AudioLevel({ stream, enabled }: { stream: MediaStream | null; enabled: boolean }) {
+  const [level, setLevel] = useState(0);
+
+  useEffect(() => {
+    if (!enabled || !stream) {
+      setLevel(0);
+      return;
+    }
+
+    const context = new AudioContext();
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    const samples = new Uint8Array(analyser.fftSize);
+    let frame = 0;
+    let active = true;
+
+    const update = () => {
+      if (!active) return;
+      analyser.getByteTimeDomainData(samples);
+      let sum = 0;
+      for (const sample of samples) {
+        const normalized = (sample - 128) / 128;
+        sum += normalized * normalized;
+      }
+      setLevel(Math.min(100, Math.round(Math.sqrt(sum / samples.length) * 250)));
+      frame = window.requestAnimationFrame(update);
+    };
+
+    update();
+    return () => {
+      active = false;
+      window.cancelAnimationFrame(frame);
+      source.disconnect();
+      analyser.disconnect();
+      void context.close();
+    };
+  }, [enabled, stream]);
+
+  return (
+    <div className="flex h-1.5 flex-1 gap-0.5 overflow-hidden rounded-full bg-slate-800" role="meter" aria-label="Nível de entrada do microfone" aria-valuemin={0} aria-valuemax={100} aria-valuenow={level}>
+      {Array.from({ length: 20 }, (_, index) => (
+        <span
+          key={index}
+          className={`h-full flex-1 rounded-full transition-colors ${level >= (index + 1) * 5 ? 'bg-emerald-400' : 'bg-transparent'}`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function RoomPage({
   room,
   socket,
   selfParticipantId,
   signalingStatus,
+  connectionStates,
   localStream,
+  microphoneStream,
   remoteStreams,
   captureSources,
   isLoadingSources,
@@ -91,6 +160,7 @@ export default function RoomPage({
   systemAudioEnabled,
   isMicrophoneEnabled,
   isMicrophoneStarting,
+  microphoneDeviceId,
   captureError,
   microphoneError,
   onLoadSources,
@@ -99,13 +169,17 @@ export default function RoomPage({
   onStopCapture,
   onToggleSystemAudio,
   onToggleMicrophone,
+  onSelectMicrophoneDevice,
   onDisableMicrophone,
   onLeaveRequested,
   onLeave,
 }: RoomPageProps) {
-  const [copyMessage, setCopyMessage] = useState('');
   const [toastMessage, setToastMessage] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
   const [participantActionError, setParticipantActionError] = useState('');
+  const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [audioSettingsError, setAudioSettingsError] = useState('');
   const [isLeaving, setIsLeaving] = useState(false);
   const [now, setNow] = useState(Date.now());
   const toastTimerRef = useRef<number | null>(null);
@@ -125,6 +199,8 @@ export default function RoomPage({
     reconnecting: 'Reconectando…',
     restoring: 'Restaurando sala…',
   };
+  const rtcConnectedCount = Object.values(connectionStates).filter((status) => status === 'connected').length;
+  const isVoiceConnected = signalingStatus === 'connected' && (isMicrophoneEnabled || rtcConnectedCount > 0);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 15_000);
@@ -139,17 +215,35 @@ export default function RoomPage({
   async function handleCopyCode() {
     try {
       await navigator.clipboard.writeText(room.inviteCode);
-      setCopyMessage('Código copiado.');
-      setToastMessage('Código copiado!');
+      setIsCopied(true);
+      setToastMessage('Código copiado para a área de transferência!');
     } catch (error) {
-      setCopyMessage(error instanceof Error ? `Não foi possível copiar: ${error.message}` : 'Não foi possível copiar o código.');
-      setToastMessage('Não foi possível copiar o código.');
-    } finally {
-      if (toastTimerRef.current !== null) {
-        window.clearTimeout(toastTimerRef.current);
-      }
-      toastTimerRef.current = window.setTimeout(() => setToastMessage(''), 3_000);
+      const message = error instanceof Error
+        ? `Não foi possível copiar o código: ${error.message}`
+        : 'Não foi possível copiar o código.';
+      setToastMessage(message);
     }
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage('');
+      setIsCopied(false);
+    }, 2_000);
+  }
+
+  async function openAudioSettings() {
+    setAudioSettingsError('');
+    setAudioSettingsOpen(true);
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setAudioInputDevices(devices.filter((device) => device.kind === 'audioinput'));
+    } catch (error) {
+      setAudioSettingsError(error instanceof Error ? error.message : 'Não foi possível carregar os dispositivos de áudio.');
+    }
+  }
+
+  async function handleAudioDeviceChange(deviceId: string) {
+    setAudioSettingsError('');
+    await onSelectMicrophoneDevice(deviceId);
   }
 
   function handlePresenceChange(value: string) {
@@ -223,7 +317,7 @@ export default function RoomPage({
     <main className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0b1020] text-slate-50 lg:h-screen lg:flex-row lg:overflow-hidden">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.1),transparent_48%)]" />
 
-      <aside className="relative z-10 flex w-full shrink-0 flex-col border-b border-slate-800 bg-slate-950/70 p-4 sm:p-5 lg:h-screen lg:w-[272px] lg:border-b-0 lg:border-r lg:px-4 lg:py-5">
+      <aside className="relative z-10 flex w-full shrink-0 flex-col border-b border-slate-800 bg-slate-950/70 p-4 sm:p-5 lg:h-screen lg:min-h-0 lg:w-[292px] lg:border-b-0 lg:border-r lg:px-3 lg:py-4">
         <div className="flex items-center gap-3 border-b border-slate-800/80 pb-4 [-webkit-app-region:drag]">
           <div className="grid h-10 w-10 place-items-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-300">
             <ScreenIcon />
@@ -234,89 +328,154 @@ export default function RoomPage({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 lg:flex-nowrap">
-          <span className="text-xs font-medium text-slate-400">{isHost ? 'Você é o host' : 'Participante'}</span>
-          <span
-            role="status"
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
-              signalingStatus === 'connected'
-                ? 'border-emerald-400/15 bg-emerald-400/[0.06] text-emerald-200'
-                : 'border-amber-400/20 bg-amber-400/[0.06] text-amber-200'
-            }`}
-          >
-            {signalingStatusLabels[signalingStatus]}
-          </span>
-        </div>
+        <section aria-label="Convite da sala" className="mt-3 rounded-lg border border-slate-700/50 bg-slate-800/40 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Convite</h2>
+            <span className="text-[10px] font-medium text-slate-400">Expira em {formatRoomTimeRemaining(room.expiresAt, now)}</span>
+          </div>
+          <div className="mt-2 flex items-center gap-2 rounded-md border border-slate-700/60 bg-slate-950/60 p-1.5 pl-2.5">
+            <span className="min-w-0 flex-1 truncate font-mono text-sm font-bold tracking-widest text-blue-200">{room.inviteCode}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => void handleCopyCode()}
+              aria-label={isCopied ? 'Código copiado' : 'Copiar código do convite'}
+              title={isCopied ? 'Copiado!' : 'Copiar código'}
+              className="h-8 w-8 shrink-0 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+            >
+              {isCopied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+          <p className="mt-1.5 text-[10px] text-slate-500">Validade: {new Date(room.expiresAt).toLocaleString()}</p>
+        </section>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-          {isHost && (
-            <section aria-label="Controles de áudio" className="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Áudio</h2>
-              <div className="mt-3 grid gap-2">
-                <Button
-                  type="button"
-                  variant={systemAudioEnabled ? 'secondary' : 'outline'}
-                  disabled={!hasSystemAudio}
-                  aria-pressed={systemAudioEnabled}
-                  onClick={() => onToggleSystemAudio(!systemAudioEnabled)}
-                  className="h-auto min-h-9 justify-start whitespace-normal border-slate-700 px-2.5 py-2 text-left text-xs leading-4 text-slate-200"
-                >
-                  {systemAudioEnabled ? 'Áudio da transmissão ligado' : 'Áudio da transmissão desligado'}
-                </Button>
-                <Button
-                  type="button"
-                  variant={isMicrophoneEnabled ? 'secondary' : 'outline'}
-                  disabled={isMicrophoneStarting}
-                  aria-pressed={isMicrophoneEnabled}
-                  onClick={() => void onToggleMicrophone()}
-                  className="h-auto min-h-9 justify-start whitespace-normal border-slate-700 px-2.5 py-2 text-left text-xs leading-4 text-slate-200"
-                >
-                  {isMicrophoneStarting
-                    ? 'Ativando microfone…'
-                    : isMicrophoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}
-                </Button>
-              </div>
-              {microphoneError && (
-                <p role="alert" className="mt-3 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-2.5 py-2 text-xs leading-5 text-red-200">
-                  {microphoneError}
-                </p>
-              )}
-              {!supportsSystemAudio && (
-                <p className="mt-3 text-xs leading-5 text-slate-500">
-                  O áudio do sistema está disponível somente no Windows.
-                </p>
-              )}
-            </section>
+        <section aria-labelledby="participants-heading" className="mt-5 flex min-h-24 flex-1 flex-col lg:min-h-0">
+          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+            <h2 id="participants-heading" className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Participantes</h2>
+            <span className="text-[11px] tabular-nums text-slate-500">{room.participants.length}/{room.maxParticipants}</span>
+          </div>
+          <ul className="mt-2 flex flex-col gap-1.5 overflow-y-auto">
+            {room.participants.map((participant) => {
+              const isSelf = participant.id === selfParticipantId;
+              const avatarHue = getParticipantAvatarHue(participant.displayName);
+              const initials = getParticipantInitials(participant.displayName);
+              const presenceColor = participant.presence === 'available'
+                ? 'bg-emerald-400'
+                : participant.presence === 'away' ? 'bg-amber-300' : 'bg-red-400';
+              const presenceLabel = participant.presence === 'available'
+                ? 'Online'
+                : participant.presence === 'away' ? 'Ausente' : 'Ocupado';
+
+              return (
+                <li key={participant.id} className="group flex items-center justify-between gap-3 rounded-md border border-slate-700/60 bg-slate-900/50 p-2.5">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span
+                      className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-semibold text-white"
+                      style={{ backgroundColor: `hsl(${avatarHue} 42% 36%)` }}
+                      role="img"
+                      aria-label={`${participant.displayName}, ${presenceLabel}`}
+                    >
+                      {initials}
+                      <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-900 ${presenceColor}`} />
+                    </span>
+                    <span className="min-w-0 truncate text-sm font-medium text-slate-200">{participant.displayName}</span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {participant.role === 'host' && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
+                        <Crown className="h-3 w-3" />Host
+                      </span>
+                    )}
+                    {isSelf && (
+                      <span className="rounded-full border border-blue-400/30 bg-blue-400/15 px-2 py-0.5 text-[11px] font-medium text-blue-200">Você</span>
+                    )}
+                    {!isSelf && participant.role !== 'host' && (
+                      <span className="rounded-full border border-slate-600/70 bg-slate-700/40 px-2 py-0.5 text-[11px] font-medium text-slate-400">Convidado</span>
+                    )}
+                  </div>
+                  {isHost && !isSelf && participant.role !== 'host' && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remover ${participant.displayName}`}
+                      title={`Remover ${participant.displayName}`}
+                      onClick={() => handleKick(participant.id, participant.displayName)}
+                      className="h-7 w-7 shrink-0 text-slate-500 hover:bg-red-400/10 hover:text-red-200"
+                    >
+                      <RemoveParticipantIcon />
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {participantActionError && (
+            <p role="alert" className="mt-2 w-fit max-w-full self-start break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2.5 py-2 text-xs leading-5 text-red-200">
+              {participantActionError}
+            </p>
           )}
+        </section>
 
-          <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Convite</h2>
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <span className="font-mono text-base font-semibold tracking-[0.14em] text-slate-100">{room.inviteCode}</span>
-              <Button type="button" variant="secondary" size="sm" onClick={() => void handleCopyCode()} className="h-8 px-2.5 text-xs">
-                Copiar
+        <div className="mt-4 border-t border-slate-800 pt-3 lg:mt-3">
+          <section aria-label="Controles de voz" className="rounded-lg border border-slate-700/50 bg-slate-900/70 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-300">
+                <span className={`h-1.5 w-1.5 rounded-full ${isVoiceConnected ? 'bg-emerald-400' : 'bg-amber-300'}`} />
+                {isVoiceConnected ? 'Voz conectada · RTC OK' : 'Voz em espera'}
+              </span>
+              <AudioLevel stream={microphoneStream} enabled={isMicrophoneEnabled} />
+            </div>
+            <div className="mt-2.5 flex items-center justify-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={isMicrophoneEnabled ? 'Desativar microfone' : 'Ativar microfone'}
+                aria-pressed={isMicrophoneEnabled}
+                disabled={isMicrophoneStarting}
+                onClick={() => void onToggleMicrophone()}
+                className={`h-9 w-9 rounded-full ${isMicrophoneEnabled ? 'bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25' : 'bg-red-400/20 text-red-300 hover:bg-red-400/30'}`}
+              >
+                {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={systemAudioEnabled ? 'Desativar áudio da transmissão' : 'Ativar áudio da transmissão'}
+                aria-pressed={systemAudioEnabled}
+                disabled={!isHost || !hasSystemAudio}
+                onClick={() => onToggleSystemAudio(!systemAudioEnabled)}
+                className={`h-9 w-9 rounded-full ${systemAudioEnabled ? 'bg-blue-400/15 text-blue-300 hover:bg-blue-400/25' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+              >
+                {systemAudioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Configurações de áudio"
+                title="Configurações de áudio"
+                onClick={() => void openAudioSettings()}
+                className="h-9 w-9 rounded-full text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              >
+                <Settings className="h-4 w-4" />
               </Button>
             </div>
-            <p aria-live="polite" className="mt-2 min-h-4 text-xs text-slate-400">{copyMessage}</p>
-            <p className="mt-1 text-[11px] text-slate-500">Válido até {new Date(room.expiresAt).toLocaleString()}</p>
-            <p className="mt-2 inline-flex rounded-full border border-blue-400/15 bg-blue-400/[0.06] px-2 py-1 text-[11px] font-medium text-blue-200">
-              {formatRoomTimeRemaining(room.expiresAt, now)}
-            </p>
+            {microphoneError && (
+              <p role="alert" className="mt-2 w-fit max-w-full break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2 py-1.5 text-xs leading-5 text-red-200">
+                {microphoneError}
+              </p>
+            )}
+            {!supportsSystemAudio && (
+              <p className="mt-2 text-center text-[10px] leading-4 text-slate-500">Áudio do sistema indisponível nesta plataforma.</p>
+            )}
           </section>
-        </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isLeaving}
-          onClick={handleLeave}
-          className="mt-4 w-full border-slate-700 text-slate-300 hover:border-red-400/30 hover:bg-red-400/[0.06] hover:text-red-200"
-        >
-          {isLeaving ? 'Saindo…' : isHost ? 'Encerrar sala' : 'Sair da sala'}
-        </Button>
-
-        <div className="mt-5 border-t border-slate-800 pt-4 lg:mt-auto">
-          {room.participants.filter((participant) => participant.id === selfParticipantId).map((participant) => {
+          <div className="mt-3 border-t border-slate-800 pt-3">
+            {room.participants.filter((participant) => participant.id === selfParticipantId).map((participant) => {
             const avatarHue = getParticipantAvatarHue(participant.displayName);
             const initials = getParticipantInitials(participant.displayName);
             const presenceColor = participant.presence === 'available'
@@ -356,6 +515,45 @@ export default function RoomPage({
               </Select>
             );
           })}
+            {isHost ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="default"
+                    disabled={isLeaving}
+                    className="mt-2 w-full justify-start gap-2 bg-red-600 text-white hover:bg-red-500"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {isLeaving ? 'Encerrando…' : 'Encerrar Sala'}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogTitle className="text-lg font-semibold">Encerrar sala?</AlertDialogTitle>
+                  <AlertDialogDescription className="mt-2 text-sm leading-6 text-slate-400">
+                    Tem certeza? Isso encerrará a sala e desconectará todos os participantes.
+                  </AlertDialogDescription>
+                  <div className="mt-6 flex justify-end gap-2">
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleLeave}>
+                      <LogOut className="h-4 w-4" />Encerrar sala
+                    </AlertDialogAction>
+                  </div>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLeaving}
+                onClick={handleLeave}
+                className="mt-2 w-full justify-start gap-2 border-slate-700 text-slate-300 hover:border-red-400/30 hover:bg-red-400/[0.06] hover:text-red-200"
+              >
+                <LogOut className="h-4 w-4" />
+                {isLeaving ? 'Saindo…' : 'Sair da Sala'}
+              </Button>
+            )}
+          </div>
         </div>
       </aside>
 
@@ -411,60 +609,8 @@ export default function RoomPage({
               )}
 
               {captureError && isHost && (
-                <p role="alert" className="mt-4 w-full rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm text-red-200">
+                <p role="alert" className="mt-4 w-fit max-w-full self-start break-words rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm text-red-200">
                   {captureError}
-                </p>
-              )}
-            </section>
-
-            <section aria-labelledby="participants-heading" className="shrink-0 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
-                <div>
-                  <h2 id="participants-heading" className="text-sm font-semibold text-slate-100">Participantes</h2>
-                  <p className="mt-1 text-xs text-slate-500">Na sala agora</p>
-                </div>
-                <span className="rounded-md bg-slate-950/70 px-2.5 py-1 text-xs font-medium tabular-nums text-slate-300">
-                  {room.participants.length} <span className="text-slate-600">/ {room.maxParticipants}</span>
-                </span>
-              </div>
-
-              <ul className="mt-3 flex max-h-32 flex-wrap gap-2 overflow-y-auto">
-                {room.participants.map((participant) => {
-                  const isSelf = participant.id === selfParticipantId;
-                  const initials = getParticipantInitials(participant.displayName);
-                  const avatarHue = getParticipantAvatarHue(participant.displayName);
-
-                  return (
-                    <li key={participant.id} className="group flex w-full max-w-[220px] min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-slate-950/50">
-                      <div
-                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-semibold tracking-wide text-white"
-                        style={{ backgroundColor: `hsl(${avatarHue} 42% 36%)` }}
-                        role="img"
-                        aria-label={`Avatar de ${participant.displayName}`}
-                      >
-                        {initials}
-                      </div>
-                      <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-200">{participant.displayName}</p>
-                      {isHost && !isSelf && participant.role !== 'host' && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Remover ${participant.displayName}`}
-                          title={`Remover ${participant.displayName}`}
-                          onClick={() => handleKick(participant.id, participant.displayName)}
-                          className="h-8 w-8 shrink-0 text-slate-500 hover:bg-red-400/10 hover:text-red-200 sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover:opacity-100"
-                        >
-                          <RemoveParticipantIcon />
-                        </Button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-              {participantActionError && (
-                <p role="alert" className="mt-3 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs text-red-200">
-                  {participantActionError}
                 </p>
               )}
             </section>
@@ -472,6 +618,54 @@ export default function RoomPage({
 
         </div>
       </div>
+
+      {audioSettingsOpen && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="audio-settings-title"
+            className="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="audio-settings-title" className="text-base font-semibold text-slate-100">Configurações de áudio</h2>
+                <p className="mt-1 text-xs leading-5 text-slate-400">Escolha o microfone que será usado nesta sala.</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" aria-label="Fechar configurações de áudio" onClick={() => setAudioSettingsOpen(false)} className="h-8 w-8">
+                <span aria-hidden="true" className="text-lg leading-none">×</span>
+              </Button>
+            </div>
+            <label className="mt-5 block text-xs font-medium text-slate-300" id="audio-input-label">Microfone</label>
+            <Select
+              value={microphoneDeviceId || 'default'}
+              onValueChange={(deviceId) => void handleAudioDeviceChange(deviceId === 'default' ? '' : deviceId)}
+            >
+              <SelectTrigger aria-labelledby="audio-input-label" className="mt-2 w-full">
+                <span className="min-w-0 flex-1 truncate">
+                  {audioInputDevices.find((device) => device.deviceId === microphoneDeviceId)?.label || 'Dispositivo padrão'}
+                </span>
+              </SelectTrigger>
+              <SelectContent position="popper" className="w-[var(--radix-select-trigger-width)]">
+                <SelectItem value="default">Dispositivo padrão</SelectItem>
+                {audioInputDevices.filter((device) => device.deviceId).map((device, index) => (
+                  <SelectItem key={device.deviceId} value={device.deviceId}>
+                    {device.label || `Microfone ${index + 1}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {audioSettingsError && (
+              <p role="alert" className="mt-3 w-fit max-w-full break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2.5 py-2 text-xs leading-5 text-red-200">
+                {audioSettingsError}
+              </p>
+            )}
+            <div className="mt-5 flex justify-end">
+              <Button type="button" variant="secondary" size="sm" onClick={() => setAudioSettingsOpen(false)}>Concluído</Button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {isSourcePickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
@@ -529,7 +723,7 @@ export default function RoomPage({
                 </p>
               )}
               {captureError && (
-                <p role="alert" className="mb-4 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm leading-5 text-red-200">
+                <p role="alert" className="mb-4 w-fit max-w-full break-words rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm leading-5 text-red-200">
                   {captureError}
                 </p>
               )}
@@ -602,7 +796,7 @@ export default function RoomPage({
         <div
           role="status"
           aria-live="polite"
-          className="fixed right-5 top-5 z-[60] rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 shadow-2xl"
+          className="fixed bottom-5 right-5 z-[90] w-fit max-w-[min(22rem,calc(100vw-2.5rem))] break-words rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 shadow-2xl"
         >
           {toastMessage}
         </div>
