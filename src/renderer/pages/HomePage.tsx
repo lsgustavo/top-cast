@@ -35,11 +35,12 @@ function ActionIcon({ action }: { action: 'create' | 'join' }) {
 }
 
 interface HomePageProps {
+  notice: string;
   onCreateRoom: () => void;
   onJoinRoom: () => void;
 }
 
-export default function HomePage({ onCreateRoom, onJoinRoom }: HomePageProps) {
+export default function HomePage({ notice, onCreateRoom, onJoinRoom }: HomePageProps) {
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1020] px-5 py-10 text-slate-50 sm:px-8">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.13),transparent_48%)]" />
@@ -103,6 +104,12 @@ export default function HomePage({ onCreateRoom, onJoinRoom }: HomePageProps) {
             </svg>
           </Button>
         </section>
+
+        {notice && (
+          <p role="status" className="mt-4 rounded-xl border border-amber-300/15 bg-amber-300/[0.05] px-4 py-3 text-center text-sm text-amber-100">
+            {notice}
+          </p>
+        )}
 
         <footer className="mt-8 flex items-center justify-center gap-2 text-xs text-slate-500">
           <span>{appInfo.name}</span>

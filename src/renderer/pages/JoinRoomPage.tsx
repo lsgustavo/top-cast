@@ -1,12 +1,27 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '../components/ui/button';
 import { APP_NAME } from '../../shared/constants/app';
+import { joinRoom } from '../lib/room-client';
+import type { RoomSnapshot } from '../../shared/types/signaling';
+import type { SignalingClient } from '../lib/signaling-client';
 
 interface JoinRoomPageProps {
+  socket: SignalingClient;
   onBack: () => void;
+  onRoomJoined: (room: RoomSnapshot) => void;
 }
 
-type SubmissionState = 'idle' | 'invalid' | 'server-unavailable';
+type SubmissionState = 'idle' | 'invalid' | 'server-error' | 'loading';
+
+const roomErrorMessages: Record<string, string> = {
+  INVALID_CODE: 'Código inválido ou sala inexistente.',
+  ROOM_EXPIRED: 'Esta sala expirou.',
+  ROOM_FULL: 'Esta sala já atingiu o limite de participantes.',
+  ALREADY_IN_ROOM: 'Este cliente já está conectado a uma sala.',
+  INVALID_NAME: 'O nome informado não é válido.',
+  RATE_LIMITED: 'Muitas tentativas de entrada. Aguarde um minuto antes de tentar novamente.',
+  SERVER_ERROR: 'Não foi possível verificar a sala. Verifique sua conexão e tente novamente.',
+};
 
 function formatInviteCode(value: string): string {
   const normalized = value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
@@ -24,24 +39,39 @@ function ScreenIcon() {
   );
 }
 
-export default function JoinRoomPage({ onBack }: JoinRoomPageProps) {
+export default function JoinRoomPage({ socket, onBack, onRoomJoined }: JoinRoomPageProps) {
   const [inviteCode, setInviteCode] = useState('');
   const [submissionState, setSubmissionState] = useState<SubmissionState>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
   const isCodeComplete = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(inviteCode);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isCodeComplete) {
       setSubmissionState('invalid');
       return;
     }
 
-    setSubmissionState('server-unavailable');
+    setSubmissionState('loading');
+    setErrorMessage('');
+    try {
+      const result = await joinRoom(socket, inviteCode, 'Participante');
+      if (!result.ok) {
+        setSubmissionState('server-error');
+        setErrorMessage(roomErrorMessages[result.error] ?? 'Não foi possível entrar na sala.');
+        return;
+      }
+      onRoomJoined(result.room);
+    } catch (cause) {
+      setSubmissionState('server-error');
+      setErrorMessage(cause instanceof Error ? cause.message : 'Não foi possível conectar ao servidor de salas.');
+    }
   }
 
   function handleCodeChange(value: string) {
     setInviteCode(formatInviteCode(value));
     setSubmissionState('idle');
+    setErrorMessage('');
   }
 
   return (
@@ -56,7 +86,13 @@ export default function JoinRoomPage({ onBack }: JoinRoomPageProps) {
             </div>
             <span className="text-sm font-semibold tracking-tight">{APP_NAME}</span>
           </div>
-          <Button type="button" variant="ghost" onClick={onBack} className="text-slate-400 hover:text-slate-100">
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={submissionState === 'loading'}
+            onClick={onBack}
+            className="text-slate-400 hover:text-slate-100"
+          >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="mr-2 h-4 w-4">
               <path d="M15.5 10h-11m4 4-4-4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -106,9 +142,14 @@ export default function JoinRoomPage({ onBack }: JoinRoomPageProps) {
                   Informe um código completo no formato XXXX-XXXX.
                 </p>
               )}
-              {submissionState === 'server-unavailable' && (
-                <p role="status" className="rounded-lg border border-amber-300/15 bg-amber-300/[0.05] px-3 py-2.5 text-sm leading-5 text-amber-100">
-                  O formato do código está correto, mas não foi possível verificar a sala: o backend ainda não está conectado.
+              {submissionState === 'server-error' && (
+                <p role="alert" className="rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm leading-5 text-red-200">
+                  {errorMessage}
+                </p>
+              )}
+              {submissionState === 'loading' && (
+                <p role="status" className="rounded-lg border border-blue-400/15 bg-blue-400/[0.05] px-3 py-2.5 text-sm text-blue-100">
+                  Conectando ao servidor e verificando o convite…
                 </p>
               )}
             </div>
@@ -116,16 +157,16 @@ export default function JoinRoomPage({ onBack }: JoinRoomPageProps) {
             <Button
               type="submit"
               size="lg"
-              disabled={!isCodeComplete}
+              disabled={!isCodeComplete || submissionState === 'loading'}
               className="mt-2 w-full bg-blue-600 text-white hover:bg-blue-500"
             >
-              Verificar código
+              {submissionState === 'loading' ? 'Verificando…' : 'Entrar na sala'}
             </Button>
           </form>
         </section>
 
         <p className="mt-5 text-center text-xs leading-5 text-slate-600">
-          A verificação de existência, validade e vagas será feita pelo servidor.
+          A existência, validade e disponibilidade de vagas são verificadas pelo servidor.
         </p>
       </div>
     </main>
