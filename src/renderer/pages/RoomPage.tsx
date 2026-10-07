@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { formatRoomTimeRemaining, getParticipantAvatarHue, getParticipantInitials } from '../lib/room-ui';
 import type { RoomSnapshot } from '../../shared/types/signaling';
 import type { CaptureSource } from '../../shared/types/desktop-api';
@@ -259,85 +260,68 @@ export default function RoomPage({
           </span>
         </header>
 
-        <div className="grid flex-1 gap-4 py-4 lg:min-h-0 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-5 lg:py-5">
-          <section className="order-1 flex min-h-[420px] flex-col items-center justify-center overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl shadow-black/10 sm:p-7 lg:order-2 lg:min-h-0">
-            {presentationStream && isReceivingVideo ? (
-              <>
-                <div className="mb-4 flex w-full items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
-                    <span className="h-2 w-2 rounded-full bg-red-400" />
-                    {isHost ? 'Sua tela está sendo compartilhada' : `${host?.displayName ?? 'Host'} está compartilhando`}
+        <div className="grid flex-1 gap-4 py-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-5 lg:py-5">
+          <div className="flex min-w-0 flex-col gap-4 lg:min-h-0">
+            <section className="flex min-h-[340px] flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/60 p-4 shadow-xl shadow-black/10 sm:min-h-[420px] sm:p-6 lg:min-h-0">
+              {presentationStream && isReceivingVideo ? (
+                <>
+                  <div className="mb-4 flex w-full items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
+                      <span className="h-2 w-2 rounded-full bg-red-400" />
+                      {isHost ? 'Sua tela está sendo compartilhada' : `${host?.displayName ?? 'Host'} está compartilhando`}
+                    </div>
+                    {isHost && (
+                      <Button type="button" variant="secondary" size="sm" onClick={onStopCapture}>
+                        Parar compartilhamento
+                      </Button>
+                    )}
                   </div>
+                  <div className="aspect-video w-full overflow-hidden rounded-2xl border border-slate-800 bg-black">
+                    <StreamVideo stream={presentationStream} muted={isHost} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid h-16 w-16 place-items-center rounded-2xl border border-blue-400/15 bg-blue-500/10 text-blue-300">
+                    <ScreenIcon className="h-7 w-7" />
+                  </div>
+                  <p className="mt-6 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Sala pronta</p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                    {isHost ? 'Compartilhe sua tela' : 'Aguardando transmissão'}
+                  </h2>
+                  <p className="mt-3 max-w-md text-center text-sm leading-6 text-slate-400">
+                    {isHost
+                      ? 'Escolha um monitor inteiro ou uma janela específica para compartilhar com a sala.'
+                      : 'O vídeo da tela compartilhada aparecerá aqui quando o host iniciar.'}
+                  </p>
                   {isHost && (
-                    <Button type="button" variant="secondary" size="sm" onClick={onStopCapture}>
-                      Parar compartilhamento
+                    <Button type="button" size="lg" onClick={openSourcePicker} className="mt-7 bg-blue-600 text-white hover:bg-blue-500">
+                      <ScreenIcon className="mr-2 h-4 w-4" />
+                      Compartilhar tela
                     </Button>
                   )}
-                </div>
-                <div className="aspect-video w-full overflow-hidden rounded-2xl border border-slate-800 bg-black">
-                  <StreamVideo stream={presentationStream} muted={isHost} />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="grid h-16 w-16 place-items-center rounded-2xl border border-blue-400/15 bg-blue-500/10 text-blue-300">
-                  <ScreenIcon className="h-7 w-7" />
-                </div>
-                <p className="mt-6 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Sala pronta</p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-                  {isHost ? 'Compartilhe sua tela' : 'Aguardando transmissão'}
-                </h2>
-                <p className="mt-3 max-w-md text-center text-sm leading-6 text-slate-400">
-                  {isHost
-                    ? 'Escolha um monitor inteiro ou uma janela específica para compartilhar com a sala.'
-                    : 'O vídeo da tela compartilhada aparecerá aqui quando o host iniciar.'}
+                </>
+              )}
+
+              {captureError && isHost && (
+                <p role="alert" className="mt-4 w-full rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm text-red-200">
+                  {captureError}
                 </p>
-                {isHost && (
-                  <Button type="button" size="lg" onClick={openSourcePicker} className="mt-7 bg-blue-600 text-white hover:bg-blue-500">
-                    <ScreenIcon className="mr-2 h-4 w-4" />
-                    Compartilhar tela
-                  </Button>
-                )}
-              </>
-            )}
+              )}
+            </section>
 
-            {captureError && isHost && (
-              <p role="alert" className="mt-4 w-full rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm text-red-200">
-                {captureError}
-              </p>
-            )}
-          </section>
-
-          <aside className="order-2 flex flex-col gap-4 lg:order-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3">
+            <section aria-labelledby="participants-heading" className="shrink-0 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
                 <div>
-                  <h2 className="text-sm font-semibold text-slate-100">Participantes</h2>
-                  <p className="mt-1 text-xs text-slate-500">Pessoas nesta sala</p>
+                  <h2 id="participants-heading" className="text-sm font-semibold text-slate-100">Participantes</h2>
+                  <p className="mt-1 text-xs text-slate-500">Na sala agora</p>
                 </div>
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-950/60 px-2.5 py-1.5 text-xs font-medium tabular-nums text-slate-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  {room.participants.length}
-                  <span className="text-slate-600">/</span>
-                  {room.maxParticipants}
+                <span className="rounded-md bg-slate-950/70 px-2.5 py-1 text-xs font-medium tabular-nums text-slate-300">
+                  {room.participants.length} <span className="text-slate-600">/ {room.maxParticipants}</span>
                 </span>
               </div>
 
-              <div
-                className="mt-4 h-1 overflow-hidden rounded-full bg-slate-800"
-                role="progressbar"
-                aria-label="Vagas ocupadas"
-                aria-valuemin={0}
-                aria-valuemax={room.maxParticipants}
-                aria-valuenow={room.participants.length}
-              >
-                <div
-                  className="h-full rounded-full bg-blue-500/80 transition-[width]"
-                  style={{ width: `${(room.participants.length / room.maxParticipants) * 100}%` }}
-                />
-              </div>
-
-              <ul className="mt-3 space-y-1.5">
+              <ul className="mt-3 grid max-h-52 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
                 {room.participants.map((participant) => {
                   const isSelf = participant.id === selfParticipantId;
                   const peerStatus = connectionStates[participant.id];
@@ -346,7 +330,7 @@ export default function RoomPage({
                     : peerStatus ?? 'waiting';
                   const connectionLabel = isSelf
                     ? signalingStatus === 'connected' ? 'Conectado' : signalingStatus === 'restoring' ? 'Restaurando' : 'Reconectando'
-                    : peerStatus ? connectionLabels[peerStatus] : 'Aguardando conexão WebRTC';
+                    : peerStatus ? connectionLabels[peerStatus] : 'Aguardando conexão';
                   const initials = getParticipantInitials(participant.displayName);
                   const avatarHue = getParticipantAvatarHue(participant.displayName);
                   const statusColor = isSelf
@@ -357,58 +341,44 @@ export default function RoomPage({
                     : participant.presence === 'away' ? 'bg-amber-300' : 'bg-red-400';
 
                   return (
-                    <li
-                      key={participant.id}
-                      className="group flex items-center gap-3 rounded-xl border border-transparent bg-slate-950/35 px-3 py-3 transition-colors hover:border-slate-700/70 hover:bg-slate-950/65"
-                    >
+                    <li key={participant.id} className="group flex min-w-0 items-center gap-3 rounded-xl border border-slate-800/80 bg-slate-950/40 p-3 transition-colors hover:border-slate-700 hover:bg-slate-950/70">
                       <div
-                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-semibold tracking-wide text-white shadow-sm"
+                        className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-semibold tracking-wide text-white"
                         style={{ backgroundColor: `hsl(${avatarHue} 42% 36%)` }}
                         role="img"
                         aria-label={`Avatar de ${participant.displayName}`}
                       >
                         {initials}
+                        <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-950 ${presenceColor}`} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-1.5">
                           <p className="truncate text-sm font-medium text-slate-100">{participant.displayName}</p>
-                          {participant.role === 'host' && (
-                            <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300/15 bg-amber-300/[0.07] px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
-                              <CrownIcon />
-                              Host
-                            </span>
-                          )}
-                          {isSelf && (
-                            <span className="shrink-0 rounded-md bg-blue-400/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-200">
-                              Você
-                            </span>
-                          )}
+                          {participant.role === 'host' && <CrownIcon />}
+                          {isSelf && <span className="shrink-0 text-[10px] text-blue-300">Você</span>}
                         </div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
-                            <span className={`h-1.5 w-1.5 rounded-full ${statusColor}`} />
-                            {connectionLabel}
+                        <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px] text-slate-400">
+                          <span className="inline-flex min-w-0 items-center gap-1.5">
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusColor}`} />
+                            <span className="truncate">{connectionLabel}</span>
                           </span>
-                          <span className={`inline-flex items-center gap-1 text-[11px] ${participant.microphoneEnabled ? 'text-slate-300' : 'text-slate-500'}`}>
+                          <span className={`inline-flex shrink-0 items-center ${participant.microphoneEnabled ? 'text-slate-300' : 'text-slate-500'}`} title={participant.microphoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}>
                             <MicrophoneIcon enabled={participant.microphoneEnabled} />
-                            {participant.microphoneEnabled ? 'Mic ligado' : 'Mic desligado'}
                           </span>
-                          {isSelf && (
-                            <label className="inline-flex items-center gap-1.5">
-                              <span className="sr-only">Seu estado de presença</span>
-                              <span className={`h-1.5 w-1.5 rounded-full ${presenceColor}`} aria-hidden="true" />
-                              <select
-                                value={participant.presence}
-                                onChange={(event) => handlePresenceChange(event.currentTarget.value)}
-                                className="cursor-pointer appearance-none border-0 bg-transparent p-0 text-[11px] text-slate-400 outline-none transition-colors hover:text-slate-200 focus-visible:text-slate-200"
-                              >
-                                <option value="available">Disponível</option>
-                                <option value="away">Ausente</option>
-                                <option value="busy">Ocupado</option>
-                              </select>
-                            </label>
-                          )}
                         </div>
+                        {isSelf && (
+                          <Select value={participant.presence} onValueChange={handlePresenceChange}>
+                            <SelectTrigger aria-label="Seu estado de presença" className="mt-2 h-7 w-full max-w-36 gap-1.5 px-2 text-xs">
+                              <span className={`h-1.5 w-1.5 rounded-full ${presenceColor}`} />
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="available">Disponível</SelectItem>
+                              <SelectItem value="away">Ausente</SelectItem>
+                              <SelectItem value="busy">Ocupado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </div>
                       {isHost && !isSelf && participant.role !== 'host' && (
                         <Button
@@ -416,9 +386,9 @@ export default function RoomPage({
                           variant="ghost"
                           size="icon"
                           aria-label={`Remover ${participant.displayName}`}
-                          title="Remover participante"
+                          title={`Remover ${participant.displayName}`}
                           onClick={() => handleKick(participant.id, participant.displayName)}
-                          className="h-8 w-8 shrink-0 rounded-lg border border-transparent text-slate-500 opacity-70 hover:border-red-400/20 hover:bg-red-400/10 hover:text-red-200 focus-visible:opacity-100 group-hover:opacity-100"
+                          className="h-8 w-8 shrink-0 text-slate-500 opacity-0 hover:bg-red-400/10 hover:text-red-200 focus-visible:opacity-100 group-hover:opacity-100"
                         >
                           <RemoveParticipantIcon />
                         </Button>
@@ -433,7 +403,9 @@ export default function RoomPage({
                 </p>
               )}
             </section>
+          </div>
 
+          <aside className="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
             {isHost && (
               <section aria-label="Controles de áudio" className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
                 <h2 className="text-sm font-semibold text-slate-200">Áudio</h2>
