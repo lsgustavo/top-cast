@@ -31,6 +31,22 @@ npm run build:installer
 Replace the example host with the actual deployed service before distributing
 the installer.
 
+For a temporary LAN-only test installer, use the signaling host's private
+network IPv4 address and explicitly opt into HTTP:
+
+```powershell
+$env:VITE_SIGNALING_URL = "http://192.168.3.3:3001"
+$env:ALLOW_INSECURE_TEST_INSTALLER = "1"
+npm run build:installer
+Remove-Item Env:ALLOW_INSECURE_TEST_INSTALLER
+```
+
+This installer is unencrypted and should only be used on a trusted private
+network. The signaling server must be running on that host with
+`SIGNALING_HOST=0.0.0.0`, and Windows Firewall must allow its port on the
+private profile. It does not include or start that server. Do not distribute
+this test installer publicly; use a public HTTPS origin for release builds.
+
 The installed app lets each user configure the signaling URL from the home
 screen; the value is saved locally. `VITE_SIGNALING_URL` still sets the default
 for a build. The installer includes the compiled signaling server but does not

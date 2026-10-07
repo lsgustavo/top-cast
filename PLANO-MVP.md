@@ -133,6 +133,11 @@ alheios ao escopo nesses commits.
   sem URLs de desenvolvimento ou segredos do servidor embutidos.
 - [ ] Gerar o instalador atualizado usando o endereço real e testar instalação,
   inicialização, desinstalação e compartilhamento em uma máquina Windows limpa.
+- [x] Disponibilizar um opt-in explícito para gerar instalador HTTP somente para
+  testes em localhost/rede privada (não serve como instalador de produção).
+- [x] Gerar `release/TopCast-Setup-0.1.0.exe` para teste LAN no endereço
+  `http://192.168.3.3:3001`; isso não substitui os testes de instalação em outro
+  computador nem o TURN público.
 - [ ] Definir assinatura de código e atualização automática como requisitos de
   distribuição pública; esses itens dependem de certificado/infraestrutura.
 - [x] Commit próprio para o bloqueio seguro de builds sem configuração de
