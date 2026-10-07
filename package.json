@@ -10,7 +10,7 @@
     "dev:electron": "tsc -p tsconfig.node.json && wait-on tcp:4173 tcp:3001 && electron dist-electron/main/main.js",
     "build": "tsc -p tsconfig.node.json && tsc -p tsconfig.server.json && tsc -p tsconfig.app.json && vite build",
     "build:windows": "npm run build && node scripts/verify-production-build.mjs",
-    "build:installer": "npm run build:windows && electron-builder --win nsis --x64",
+    "build:installer": "node scripts/verify-installer-config.mjs && npm run build:windows && electron-builder --win nsis --x64",
     "verify:production": "node scripts/verify-production-build.mjs",
     "test:signaling-smoke": "node scripts/smoke-test-signaling.mjs",
     "preview": "vite preview --host",

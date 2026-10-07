@@ -17,14 +17,19 @@ Generate the Windows x64 NSIS setup executable with:
 npm run build:installer
 ```
 
-The installer is written under `release/`. Set `VITE_SIGNALING_URL` before
-building when the app should connect to a deployed signaling server, for
+The installer is written under `release/`. An installer build now requires a
+public HTTPS signaling origin; it intentionally rejects the development
+localhost default so a distributed app is not silently built against a server
+on the user's own computer. Set `VITE_SIGNALING_URL` before building, for
 example:
 
 ```powershell
 $env:VITE_SIGNALING_URL = "https://signaling.example.com"
 npm run build:installer
 ```
+
+Replace the example host with the actual deployed service before distributing
+the installer.
 
 The installed app lets each user configure the signaling URL from the home
 screen; the value is saved locally. `VITE_SIGNALING_URL` still sets the default

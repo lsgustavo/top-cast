@@ -88,7 +88,7 @@ alheios ao escopo nesses commits.
 - [x] Revisar reconexão do signaling, retorno do host com novo convite,
   reentrada de convidados e encerramento/expiração da sala.
 - [x] Corrigir os casos reproduzíveis e cobrir a lógica com testes.
-- [x] Commit próprio após validação.
+- [x] Commit próprio após validação (`98d3251`).
 
 ### Etapa 5 — Testes de ponta a ponta e critérios de rede
 
@@ -103,19 +103,24 @@ alheios ao escopo nesses commits.
   obrigatório (validar também a seleção relay no diagnóstico WebRTC).
 - [ ] Registrar qualquer limitação reproduzível e corrigir antes de aceitar o
   MVP.
-- [x] Commit próprio para alterações automatizáveis. O teste em outra máquina é
-  um gate manual e só pode ser marcado como feito após execução real.
+- [x] Commit próprio para alterações automatizáveis (`2f228f4`). O teste em
+  outra máquina é um gate manual e só pode ser marcado como feito após execução
+  real.
 
 ### Etapa 6 — Build e distribuição Windows
 
-- [ ] Garantir que o instalador use o endereço HTTPS/WSS do signaling publicado,
+- [x] Garantir que o instalador exija um endereço HTTPS do signaling em vez de
+  usar o localhost padrão.
+- [x] Verificar que a configuração ausente ou HTTP/loopback é recusada antes
+  de empacotar.
+- [ ] Configurar o endereço HTTPS/WSS real do signaling publicado,
   sem URLs de desenvolvimento ou segredos do servidor embutidos.
-- [ ] Gerar instalador e testar instalação, inicialização, desinstalação e
-  compartilhamento em uma máquina Windows limpa.
+- [ ] Gerar o instalador atualizado usando o endereço real e testar instalação,
+  inicialização, desinstalação e compartilhamento em uma máquina Windows limpa.
 - [ ] Definir assinatura de código e atualização automática como requisitos de
   distribuição pública; esses itens dependem de certificado/infraestrutura.
-- [ ] Commit próprio para alterações de build/documentação; validar o artefato
-  local sem afirmar validação em máquina que não foi testada.
+- [x] Commit próprio para o bloqueio seguro de builds sem configuração de
+  produção.
 
 ## Variáveis e infraestrutura de produção
 
