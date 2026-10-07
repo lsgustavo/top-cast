@@ -1,19 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select';
 import { formatRoomTimeRemaining, getParticipantAvatarHue, getParticipantInitials } from '../lib/room-ui';
 import type { RoomSnapshot } from '../../shared/types/signaling';
 import type { CaptureSource } from '../../shared/types/desktop-api';
 import type { SignalingStatus } from '../../shared/types/signaling';
 import type { SignalingClient } from '../lib/signaling-client';
-import type { PeerConnectionStatus } from '../features/streaming/use-room-webrtc';
 
 interface RoomPageProps {
   room: RoomSnapshot;
   socket: SignalingClient;
   selfParticipantId: string | null;
   signalingStatus: SignalingStatus;
-  connectionStates: Record<string, PeerConnectionStatus>;
   localStream: MediaStream | null;
   remoteStreams: Record<string, MediaStream>;
   captureSources: CaptureSource[];
@@ -39,22 +37,6 @@ interface RoomPageProps {
   onLeaveRequested: () => void;
   onLeave: () => void;
 }
-
-const connectionLabels: Record<PeerConnectionStatus, string> = {
-  connecting: 'Conectando',
-  connected: 'Conectado',
-  disconnected: 'Interrompido',
-  failed: 'Falha na conexão',
-};
-
-const connectionIndicatorClasses: Record<PeerConnectionStatus | 'waiting' | 'reconnecting', string> = {
-  connecting: 'bg-amber-300',
-  connected: 'bg-emerald-400',
-  disconnected: 'bg-amber-500',
-  failed: 'bg-red-400',
-  waiting: 'bg-slate-600',
-  reconnecting: 'bg-amber-300',
-};
 
 function StreamVideo({ stream, muted = false }: { stream: MediaStream; muted?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -96,7 +78,6 @@ export default function RoomPage({
   socket,
   selfParticipantId,
   signalingStatus,
-  connectionStates,
   localStream,
   remoteStreams,
   captureSources,
@@ -239,18 +220,25 @@ export default function RoomPage({
   }
 
   return (
-    <main className="relative flex min-h-screen flex-col overflow-hidden bg-[#0b1020] px-4 py-4 text-slate-50 sm:px-6 sm:py-5 lg:h-screen">
+    <main className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0b1020] text-slate-50 lg:h-screen lg:flex-row lg:overflow-hidden">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.1),transparent_48%)]" />
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[1600px] flex-1 flex-col lg:min-h-0">
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-800/80 pb-4 [-webkit-app-region:drag]">
-          <div>
-            <h1 className="text-base font-semibold">Sala de transmissão</h1>
-            <p className="mt-1 text-xs text-slate-500">{isHost ? 'Você é o host' : 'Você entrou como participante'}</p>
+      <aside className="relative z-10 flex w-full shrink-0 flex-col border-b border-slate-800 bg-slate-950/70 p-4 sm:p-5 lg:h-screen lg:w-[272px] lg:border-b-0 lg:border-r lg:px-4 lg:py-5">
+        <div className="flex items-center gap-3 border-b border-slate-800/80 pb-4 [-webkit-app-region:drag]">
+          <div className="grid h-10 w-10 place-items-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-300">
+            <ScreenIcon />
           </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-semibold tracking-tight">TopCast</h1>
+            <p className="mt-0.5 text-xs text-slate-500">Sala de transmissão</p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 lg:flex-nowrap">
+          <span className="text-xs font-medium text-slate-400">{isHost ? 'Você é o host' : 'Participante'}</span>
           <span
             role="status"
-            className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
               signalingStatus === 'connected'
                 ? 'border-emerald-400/15 bg-emerald-400/[0.06] text-emerald-200'
                 : 'border-amber-400/20 bg-amber-400/[0.06] text-amber-200'
@@ -258,10 +246,129 @@ export default function RoomPage({
           >
             {signalingStatusLabels[signalingStatus]}
           </span>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+          {isHost && (
+            <section aria-label="Controles de áudio" className="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Áudio</h2>
+              <div className="mt-3 grid gap-2">
+                <Button
+                  type="button"
+                  variant={systemAudioEnabled ? 'secondary' : 'outline'}
+                  disabled={!hasSystemAudio}
+                  aria-pressed={systemAudioEnabled}
+                  onClick={() => onToggleSystemAudio(!systemAudioEnabled)}
+                  className="h-auto min-h-9 justify-start whitespace-normal border-slate-700 px-2.5 py-2 text-left text-xs leading-4 text-slate-200"
+                >
+                  {systemAudioEnabled ? 'Áudio da transmissão ligado' : 'Áudio da transmissão desligado'}
+                </Button>
+                <Button
+                  type="button"
+                  variant={isMicrophoneEnabled ? 'secondary' : 'outline'}
+                  disabled={isMicrophoneStarting}
+                  aria-pressed={isMicrophoneEnabled}
+                  onClick={() => void onToggleMicrophone()}
+                  className="h-auto min-h-9 justify-start whitespace-normal border-slate-700 px-2.5 py-2 text-left text-xs leading-4 text-slate-200"
+                >
+                  {isMicrophoneStarting
+                    ? 'Ativando microfone…'
+                    : isMicrophoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}
+                </Button>
+              </div>
+              {microphoneError && (
+                <p role="alert" className="mt-3 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-2.5 py-2 text-xs leading-5 text-red-200">
+                  {microphoneError}
+                </p>
+              )}
+              {!supportsSystemAudio && (
+                <p className="mt-3 text-xs leading-5 text-slate-500">
+                  O áudio do sistema está disponível somente no Windows.
+                </p>
+              )}
+            </section>
+          )}
+
+          <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Convite</h2>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <span className="font-mono text-base font-semibold tracking-[0.14em] text-slate-100">{room.inviteCode}</span>
+              <Button type="button" variant="secondary" size="sm" onClick={() => void handleCopyCode()} className="h-8 px-2.5 text-xs">
+                Copiar
+              </Button>
+            </div>
+            <p aria-live="polite" className="mt-2 min-h-4 text-xs text-slate-400">{copyMessage}</p>
+            <p className="mt-1 text-[11px] text-slate-500">Válido até {new Date(room.expiresAt).toLocaleString()}</p>
+            <p className="mt-2 inline-flex rounded-full border border-blue-400/15 bg-blue-400/[0.06] px-2 py-1 text-[11px] font-medium text-blue-200">
+              {formatRoomTimeRemaining(room.expiresAt, now)}
+            </p>
+          </section>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isLeaving}
+          onClick={handleLeave}
+          className="mt-4 w-full border-slate-700 text-slate-300 hover:border-red-400/30 hover:bg-red-400/[0.06] hover:text-red-200"
+        >
+          {isLeaving ? 'Saindo…' : isHost ? 'Encerrar sala' : 'Sair da sala'}
+        </Button>
+
+        <div className="mt-5 border-t border-slate-800 pt-4 lg:mt-auto">
+          {room.participants.filter((participant) => participant.id === selfParticipantId).map((participant) => {
+            const avatarHue = getParticipantAvatarHue(participant.displayName);
+            const initials = getParticipantInitials(participant.displayName);
+            const presenceColor = participant.presence === 'available'
+              ? 'bg-emerald-400'
+              : participant.presence === 'away' ? 'bg-amber-300' : 'bg-red-400';
+            const presenceLabel = participant.presence === 'available'
+              ? 'Disponível'
+              : participant.presence === 'away' ? 'Ausente' : 'Ocupado';
+
+            return (
+              <Select key={participant.id} value={participant.presence} onValueChange={handlePresenceChange}>
+                <SelectTrigger
+                  aria-label={`Alterar status de ${participant.displayName}`}
+                  title="Clique para alterar seu status"
+                  className="h-auto w-full justify-start gap-3 rounded-xl border-transparent bg-slate-900/70 p-3 text-left hover:border-slate-700 hover:bg-slate-900 focus:ring-blue-500/40"
+                >
+                  <span
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-semibold tracking-wide text-white"
+                    style={{ backgroundColor: `hsl(${avatarHue} 42% 36%)` }}
+                    aria-hidden="true"
+                  >
+                    {initials}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-slate-100">{participant.displayName}</span>
+                    <span className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+                      <span className={`h-1.5 w-1.5 rounded-full ${presenceColor}`} />
+                      {presenceLabel}
+                    </span>
+                  </span>
+                </SelectTrigger>
+                <SelectContent side="top" align="start" className="w-[240px]">
+                  <SelectItem value="available">Disponível</SelectItem>
+                  <SelectItem value="away">Ausente</SelectItem>
+                  <SelectItem value="busy">Ocupado</SelectItem>
+                </SelectContent>
+              </Select>
+            );
+          })}
+        </div>
+      </aside>
+
+      <div className="relative mx-auto flex min-h-[calc(100vh-1rem)] w-full max-w-[1600px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-800/80 pb-4 [-webkit-app-region:drag]">
+          <div>
+            <h2 className="text-base font-semibold">Sala de transmissão</h2>
+            <p className="mt-1 text-xs text-slate-500">{isHost ? 'Compartilhe sua tela com a sala' : 'Acompanhe a transmissão'}</p>
+          </div>
         </header>
 
-        <div className="grid flex-1 gap-4 py-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-5 lg:py-5">
-          <div className="flex min-w-0 flex-col gap-4 lg:min-h-0">
+        <div className="flex flex-1 flex-col gap-4 py-4 lg:min-h-0 lg:py-5">
+          <div className="flex min-w-0 flex-1 flex-col gap-4 lg:min-h-0">
             <section className="flex min-h-[340px] flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/60 p-4 shadow-xl shadow-black/10 sm:min-h-[420px] sm:p-6 lg:min-h-0">
               {presentationStream && isReceivingVideo ? (
                 <>
@@ -321,65 +428,23 @@ export default function RoomPage({
                 </span>
               </div>
 
-              <ul className="mt-3 grid max-h-52 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+              <ul className="mt-3 flex max-h-32 flex-wrap gap-2 overflow-y-auto">
                 {room.participants.map((participant) => {
                   const isSelf = participant.id === selfParticipantId;
-                  const peerStatus = connectionStates[participant.id];
-                  const connectionStatus = isSelf
-                    ? signalingStatus === 'connected' ? 'connected' : 'reconnecting'
-                    : peerStatus ?? 'waiting';
-                  const connectionLabel = isSelf
-                    ? signalingStatus === 'connected' ? 'Conectado' : signalingStatus === 'restoring' ? 'Restaurando' : 'Reconectando'
-                    : peerStatus ? connectionLabels[peerStatus] : 'Aguardando conexão';
                   const initials = getParticipantInitials(participant.displayName);
                   const avatarHue = getParticipantAvatarHue(participant.displayName);
-                  const statusColor = isSelf
-                    ? signalingStatus === 'connected' ? 'bg-emerald-400' : 'bg-amber-300'
-                    : connectionIndicatorClasses[connectionStatus];
-                  const presenceColor = participant.presence === 'available'
-                    ? 'bg-emerald-400'
-                    : participant.presence === 'away' ? 'bg-amber-300' : 'bg-red-400';
 
                   return (
-                    <li key={participant.id} className="group flex min-w-0 items-center gap-3 rounded-xl border border-slate-800/80 bg-slate-950/40 p-3 transition-colors hover:border-slate-700 hover:bg-slate-950/70">
+                    <li key={participant.id} className="group flex w-full max-w-[220px] min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-slate-950/50">
                       <div
-                        className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-semibold tracking-wide text-white"
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-semibold tracking-wide text-white"
                         style={{ backgroundColor: `hsl(${avatarHue} 42% 36%)` }}
                         role="img"
                         aria-label={`Avatar de ${participant.displayName}`}
                       >
                         {initials}
-                        <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-950 ${presenceColor}`} />
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <p className="truncate text-sm font-medium text-slate-100">{participant.displayName}</p>
-                          {participant.role === 'host' && <CrownIcon />}
-                          {isSelf && <span className="shrink-0 text-[10px] text-blue-300">Você</span>}
-                        </div>
-                        <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px] text-slate-400">
-                          <span className="inline-flex min-w-0 items-center gap-1.5">
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusColor}`} />
-                            <span className="truncate">{connectionLabel}</span>
-                          </span>
-                          <span className={`inline-flex shrink-0 items-center ${participant.microphoneEnabled ? 'text-slate-300' : 'text-slate-500'}`} title={participant.microphoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}>
-                            <MicrophoneIcon enabled={participant.microphoneEnabled} />
-                          </span>
-                        </div>
-                        {isSelf && (
-                          <Select value={participant.presence} onValueChange={handlePresenceChange}>
-                            <SelectTrigger aria-label="Seu estado de presença" className="mt-2 h-7 w-full max-w-36 gap-1.5 px-2 text-xs">
-                              <span className={`h-1.5 w-1.5 rounded-full ${presenceColor}`} />
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="available">Disponível</SelectItem>
-                              <SelectItem value="away">Ausente</SelectItem>
-                              <SelectItem value="busy">Ocupado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
+                      <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-200">{participant.displayName}</p>
                       {isHost && !isSelf && participant.role !== 'host' && (
                         <Button
                           type="button"
@@ -388,7 +453,7 @@ export default function RoomPage({
                           aria-label={`Remover ${participant.displayName}`}
                           title={`Remover ${participant.displayName}`}
                           onClick={() => handleKick(participant.id, participant.displayName)}
-                          className="h-8 w-8 shrink-0 text-slate-500 opacity-0 hover:bg-red-400/10 hover:text-red-200 focus-visible:opacity-100 group-hover:opacity-100"
+                          className="h-8 w-8 shrink-0 text-slate-500 hover:bg-red-400/10 hover:text-red-200 sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover:opacity-100"
                         >
                           <RemoveParticipantIcon />
                         </Button>
@@ -405,72 +470,6 @@ export default function RoomPage({
             </section>
           </div>
 
-          <aside className="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
-            {isHost && (
-              <section aria-label="Controles de áudio" className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-                <h2 className="text-sm font-semibold text-slate-200">Áudio</h2>
-                <div className="mt-3 grid gap-2">
-                  <Button
-                    type="button"
-                    variant={systemAudioEnabled ? 'secondary' : 'outline'}
-                    disabled={!hasSystemAudio}
-                    aria-pressed={systemAudioEnabled}
-                    onClick={() => onToggleSystemAudio(!systemAudioEnabled)}
-                    className="justify-start border-slate-700 text-slate-200"
-                  >
-                    {systemAudioEnabled ? 'Áudio da transmissão ligado' : 'Áudio da transmissão desligado'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={isMicrophoneEnabled ? 'secondary' : 'outline'}
-                    disabled={isMicrophoneStarting}
-                    aria-pressed={isMicrophoneEnabled}
-                    onClick={() => void onToggleMicrophone()}
-                    className="justify-start border-slate-700 text-slate-200"
-                  >
-                    {isMicrophoneStarting
-                      ? 'Ativando microfone…'
-                      : isMicrophoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}
-                  </Button>
-                </div>
-                {microphoneError && (
-                  <p role="alert" className="mt-3 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-xs leading-5 text-red-200">
-                    {microphoneError}
-                  </p>
-                )}
-                {!supportsSystemAudio && (
-                  <p className="mt-3 text-xs leading-5 text-slate-500">
-                    A captura do áudio do sistema está disponível somente no Windows.
-                  </p>
-                )}
-              </section>
-            )}
-
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-              <h2 className="text-sm font-semibold text-slate-200">Código do convite</h2>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <span className="font-mono text-lg font-semibold tracking-[0.16em] text-slate-100">{room.inviteCode}</span>
-                <Button type="button" variant="secondary" size="sm" onClick={() => void handleCopyCode()}>
-                  Copiar
-                </Button>
-              </div>
-              <p aria-live="polite" className="mt-2 min-h-4 text-xs text-slate-400">{copyMessage}</p>
-              <p className="mt-1 text-xs text-slate-500">Válido até {new Date(room.expiresAt).toLocaleString()}</p>
-              <p className="mt-2 inline-flex rounded-full border border-blue-400/15 bg-blue-400/[0.06] px-2.5 py-1 text-xs font-medium text-blue-200">
-                {formatRoomTimeRemaining(room.expiresAt, now)}
-              </p>
-            </section>
-
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isLeaving}
-              onClick={handleLeave}
-              className="w-full border-slate-700 text-slate-300 hover:border-red-400/30 hover:bg-red-400/[0.06] hover:text-red-200"
-            >
-              {isLeaving ? 'Saindo…' : isHost ? 'Encerrar sala' : 'Sair da sala'}
-            </Button>
-          </aside>
         </div>
       </div>
 
@@ -609,29 +608,6 @@ export default function RoomPage({
         </div>
       )}
     </main>
-  );
-}
-
-function CrownIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 shrink-0 text-amber-300">
-      <path d="m3 6 3.1 2.3L10 3l3.9 5.3L17 6l-1.3 9H4.3L3 6Zm2 10h10v1H5v-1Z" />
-    </svg>
-  );
-}
-
-function MicrophoneIcon({ enabled }: { enabled: boolean }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 shrink-0">
-      <path
-        d="M8 10.5a2.25 2.25 0 0 0 2.25-2.25v-4a2.25 2.25 0 0 0-4.5 0v4A2.25 2.25 0 0 0 8 10.5Z M4.75 7.75v.5a3.25 3.25 0 0 0 6.5 0v-.5 M8 11.5v2 M6.25 13.5h3.5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.25"
-      />
-      {!enabled && <path d="m3 3 10 10" stroke="currentColor" strokeLinecap="round" strokeWidth="1.25" />}
-    </svg>
   );
 }
 

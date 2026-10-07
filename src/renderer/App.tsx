@@ -308,7 +308,6 @@ export default function App() {
           null
         }
         signalingStatus={signalingStatus}
-        connectionStates={connectionStates}
         localStream={screenCapture.stream}
         remoteStreams={remoteStreams}
         captureSources={screenCapture.sources}
