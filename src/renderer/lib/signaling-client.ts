@@ -12,8 +12,9 @@ export function createSignalingClient(): SignalingClient {
   return io(signalingUrl, {
     autoConnect: false,
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
+    reconnectionDelayMax: 10_000,
     timeout: 5000,
   }) as SignalingClient;
 }

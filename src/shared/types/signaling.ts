@@ -1,5 +1,7 @@
 export const SIGNALING_PROTOCOL_VERSION = 1;
 
+export type SignalingStatus = 'connected' | 'reconnecting' | 'restoring';
+
 export interface ServerReadyMessage {
   protocolVersion: number;
 }

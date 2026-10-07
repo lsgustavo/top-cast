@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button';
 import type { RoomSnapshot } from '../../shared/types/signaling';
 import type { CaptureSource } from '../../shared/types/desktop-api';
+import type { SignalingStatus } from '../../shared/types/signaling';
 import type { SignalingClient } from '../lib/signaling-client';
 import type { PeerConnectionStatus } from '../features/streaming/use-room-webrtc';
 
 interface RoomPageProps {
   room: RoomSnapshot;
   socket: SignalingClient;
+  signalingStatus: SignalingStatus;
   connectionStates: Record<string, PeerConnectionStatus>;
   localStream: MediaStream | null;
   remoteStreams: Record<string, MediaStream>;
@@ -31,6 +33,7 @@ interface RoomPageProps {
   onToggleSystemAudio: (enabled: boolean) => void;
   onToggleMicrophone: () => Promise<boolean>;
   onDisableMicrophone: () => void;
+  onLeaveRequested: () => void;
   onLeave: () => void;
 }
 
@@ -79,6 +82,7 @@ function ScreenIcon({ className = 'h-5 w-5' }: { className?: string }) {
 export default function RoomPage({
   room,
   socket,
+  signalingStatus,
   connectionStates,
   localStream,
   remoteStreams,
@@ -102,6 +106,7 @@ export default function RoomPage({
   onToggleSystemAudio,
   onToggleMicrophone,
   onDisableMicrophone,
+  onLeaveRequested,
   onLeave,
 }: RoomPageProps) {
   const [copyMessage, setCopyMessage] = useState('');
@@ -117,6 +122,11 @@ export default function RoomPage({
     isHost || presentationStream.getVideoTracks().some((track) => !track.muted && track.readyState === 'live')
   );
   const filteredSources = captureSources.filter((source) => source.kind === sourceKind);
+  const signalingStatusLabels: Record<SignalingStatus, string> = {
+    connected: 'Conectado',
+    reconnecting: 'Reconectando…',
+    restoring: 'Restaurando sala…',
+  };
 
   async function handleCopyCode() {
     try {
@@ -159,6 +169,7 @@ export default function RoomPage({
 
   function handleLeave() {
     setIsLeaving(true);
+    onLeaveRequested();
     onStopCapture();
     onDisableMicrophone();
     socket.emit('room:leave', () => onLeave());
@@ -174,8 +185,15 @@ export default function RoomPage({
             <h1 className="text-base font-semibold">Sala de transmissão</h1>
             <p className="mt-1 text-xs text-slate-500">{isHost ? 'Você é o host' : 'Você entrou como participante'}</p>
           </div>
-          <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1.5 text-xs font-medium text-emerald-200">
-            Conectado
+          <span
+            role="status"
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+              signalingStatus === 'connected'
+                ? 'border-emerald-400/15 bg-emerald-400/[0.06] text-emerald-200'
+                : 'border-amber-400/20 bg-amber-400/[0.06] text-amber-200'
+            }`}
+          >
+            {signalingStatusLabels[signalingStatus]}
           </span>
         </header>
 

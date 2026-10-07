@@ -1,22 +1,35 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import CreateRoomPage from './pages/CreateRoomPage';
 import HomePage from './pages/HomePage';
 import JoinRoomPage from './pages/JoinRoomPage';
 import RoomPage from './pages/RoomPage';
 import { createSignalingClient } from './lib/signaling-client';
-import type { RoomSnapshot } from '../shared/types/signaling';
+import type { RoomSnapshot, SignalingStatus } from '../shared/types/signaling';
+import { createRoom as requestRoomCreation, joinRoom as requestRoomJoin } from './lib/room-client';
 import { useRoomWebRtc } from './features/streaming/use-room-webrtc';
 import { useScreenCapture } from './features/streaming/use-screen-capture';
 import { useMicrophone } from './features/streaming/use-microphone';
+
+interface ReconnectIdentity {
+  inviteCode: string;
+  displayName: string;
+  role: 'host' | 'guest';
+}
 
 export default function App() {
   const [page, setPage] = useState<'home' | 'create-room' | 'join-room' | 'room'>('home');
   const [socket] = useState(createSignalingClient);
   const [room, setRoom] = useState<RoomSnapshot | null>(null);
   const [homeNotice, setHomeNotice] = useState('');
+  const [signalingStatus, setSignalingStatus] = useState<SignalingStatus>('connected');
   const screenCapture = useScreenCapture();
   const microphone = useMicrophone();
   const [microphoneSyncError, setMicrophoneSyncError] = useState<string | null>(null);
+  const roomRef = useRef(room);
+  const hadSocketConnectionRef = useRef(false);
+  const reconnectIdentityRef = useRef<ReconnectIdentity | null>(null);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  roomRef.current = room;
   const { connectionStates, remoteStreams } = useRoomWebRtc(
     socket,
     room,
@@ -36,6 +49,7 @@ export default function App() {
       setRoom((currentRoom) => currentRoom?.id === updatedRoom.id ? updatedRoom : currentRoom);
     };
     const handleRoomClosed = ({ reason }: { reason: 'host-left' | 'expired' }) => {
+      reconnectIdentityRef.current = null;
       screenCapture.stopCapture();
       microphone.disable();
       setRoom(null);
@@ -51,6 +65,95 @@ export default function App() {
       socket.disconnect();
     };
   }, [socket, screenCapture.stopCapture, microphone.disable]);
+
+  useEffect(() => {
+    const handleConnect = () => {
+      if (!hadSocketConnectionRef.current) {
+        hadSocketConnectionRef.current = true;
+        setSignalingStatus('connected');
+        return;
+      }
+      if (reconnectIdentityRef.current) {
+        setSignalingStatus('restoring');
+        setReconnectAttempt((attempt) => attempt + 1);
+      } else {
+        setSignalingStatus('connected');
+      }
+    };
+    const handleDisconnect = () => {
+      const activeRoom = roomRef.current;
+      const participant = activeRoom?.participants.find((candidate) => candidate.id === socket.id);
+      if (activeRoom && participant) {
+        reconnectIdentityRef.current = {
+          inviteCode: activeRoom.inviteCode,
+          displayName: participant.displayName,
+          role: participant.role,
+        };
+      }
+      setSignalingStatus('reconnecting');
+    };
+    const handleConnectError = () => setSignalingStatus('reconnecting');
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleConnectError);
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleConnectError);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    if (reconnectAttempt === 0) {
+      return;
+    }
+    const identity = reconnectIdentityRef.current;
+    if (!identity) {
+      setSignalingStatus('connected');
+      return;
+    }
+
+    let cancelled = false;
+    const restoreRoom = async () => {
+      try {
+        if (identity.role === 'host') {
+          const result = await requestRoomCreation(socket, identity.displayName);
+          if (!result.ok) {
+            throw new Error(`Não foi possível recriar sua sala (${result.error}).`);
+          }
+          if (cancelled) return;
+          setRoom(result.room);
+          setPage('room');
+          setHomeNotice('Conexão restaurada. A sala anterior foi encerrada; compartilhe o novo código de convite.');
+        } else {
+          const result = await requestRoomJoin(socket, identity.inviteCode, identity.displayName);
+          if (!result.ok) {
+            throw new Error(`Não foi possível reentrar na sala (${result.error}).`);
+          }
+          if (cancelled) return;
+          setRoom(result.room);
+          setPage('room');
+          setHomeNotice('');
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setRoom(null);
+        setPage('home');
+        setHomeNotice(error instanceof Error ? error.message : 'Não foi possível restaurar a sala.');
+      } finally {
+        if (!cancelled) {
+          reconnectIdentityRef.current = null;
+          setSignalingStatus('connected');
+        }
+      }
+    };
+
+    void restoreRoom();
+    return () => {
+      cancelled = true;
+    };
+  }, [reconnectAttempt, socket]);
 
   useEffect(() => {
     if (!room || !socket.connected) {
@@ -69,6 +172,7 @@ export default function App() {
         socket={socket}
         onBack={() => setPage('home')}
         onRoomCreated={(createdRoom) => {
+          reconnectIdentityRef.current = null;
           setHomeNotice('');
           setRoom(createdRoom);
           setPage('room');
@@ -83,6 +187,7 @@ export default function App() {
         socket={socket}
         onBack={() => setPage('home')}
         onRoomJoined={(joinedRoom) => {
+          reconnectIdentityRef.current = null;
           setHomeNotice('');
           setRoom(joinedRoom);
           setPage('room');
@@ -96,6 +201,7 @@ export default function App() {
       <RoomPage
         room={room}
         socket={socket}
+        signalingStatus={signalingStatus}
         connectionStates={connectionStates}
         localStream={screenCapture.stream}
         remoteStreams={remoteStreams}
@@ -119,7 +225,11 @@ export default function App() {
         onToggleSystemAudio={screenCapture.setSystemAudioEnabled}
         onToggleMicrophone={microphone.toggle}
         onDisableMicrophone={microphone.disable}
+        onLeaveRequested={() => {
+          reconnectIdentityRef.current = null;
+        }}
         onLeave={() => {
+          reconnectIdentityRef.current = null;
           screenCapture.stopCapture();
           microphone.disable();
           setRoom(null);

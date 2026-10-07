@@ -44,6 +44,7 @@ export function useRoomWebRtc(
   const microphoneSendersRef = useRef(new Map<string, RTCRtpSender>());
   const remoteStreamsRef = useRef(new Map<string, MediaStream>());
   const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>());
+  const selfParticipantIdRef = useRef<string | null>(null);
   const roomRef = useRef<RoomSnapshot | null>(room);
   roomRef.current = room;
 
@@ -250,6 +251,7 @@ export function useRoomWebRtc(
       microphoneSendersRef.current.clear();
       pendingCandidatesRef.current.clear();
       remoteStreamsRef.current.clear();
+      selfParticipantIdRef.current = null;
       setRemoteStreams({});
     };
   }, [socket]);
@@ -274,6 +276,21 @@ export function useRoomWebRtc(
     if (!self) {
       return;
     }
+
+    if (selfParticipantIdRef.current && selfParticipantIdRef.current !== self.id) {
+      for (const connection of peerConnectionsRef.current.values()) {
+        connection.close();
+      }
+      peerConnectionsRef.current.clear();
+      videoSendersRef.current.clear();
+      systemAudioSendersRef.current.clear();
+      microphoneSendersRef.current.clear();
+      pendingCandidatesRef.current.clear();
+      remoteStreamsRef.current.clear();
+      setConnectionStates({});
+      setRemoteStreams({});
+    }
+    selfParticipantIdRef.current = self.id;
 
     const participantsById = new Map(room.participants.map((participant) => [participant.id, participant]));
     for (const [peerId, connection] of peerConnectionsRef.current) {
@@ -423,33 +440,74 @@ async function negotiateHostConnection(
   controlChannel.onopen = () => updateStatus('connected');
   controlChannel.onclose = () => updateStatus('disconnected');
 
+  let iceRestartAttempts = 0;
+  let restartingIce = false;
+  const restartIce = async () => {
+    if (restartingIce || iceRestartAttempts >= 2) {
+      return;
+    }
+    restartingIce = true;
+    iceRestartAttempts += 1;
+    try {
+      if (connection.signalingState === 'have-local-offer') {
+        await connection.setLocalDescription({ type: 'rollback' });
+      }
+      if (connection.signalingState !== 'stable') {
+        return;
+      }
+      connection.restartIce();
+      await sendHostOffer(socket, peerId, connection, true);
+    } catch {
+      updateStatus('failed');
+    } finally {
+      restartingIce = false;
+    }
+  };
+  connection.oniceconnectionstatechange = () => {
+    if (connection.iceConnectionState === 'failed') {
+      updateStatus('failed');
+      void restartIce();
+    } else if (connection.iceConnectionState === 'disconnected') {
+      updateStatus('disconnected');
+    }
+  };
+
   try {
     await Promise.all([
       videoSender.replaceTrack(videoTrack),
       systemAudioSender.replaceTrack(systemAudioTrack),
       microphoneSender.replaceTrack(microphoneTrack),
     ]);
-    const offer = await connection.createOffer();
-    await connection.setLocalDescription(offer);
-    const localDescription = connection.localDescription;
-    if (!localDescription || localDescription.type !== 'offer' || !localDescription.sdp) {
-      throw new Error('Could not create a WebRTC offer');
-    }
-
-    const result = await relayWithAcknowledgment((acknowledge) => {
-      socket.emit(
-        'webrtc:description',
-        {
-          toParticipantId: peerId,
-          description: { type: 'offer', sdp: localDescription.sdp },
-        },
-        acknowledge,
-      );
-    });
-    if (!result.ok) {
-      throw new Error(`Signaling server rejected offer: ${result.error}`);
-    }
+    await sendHostOffer(socket, peerId, connection, false);
   } catch {
     updateStatus('failed');
+  }
+}
+
+async function sendHostOffer(
+  socket: SignalingClient,
+  peerId: string,
+  connection: RTCPeerConnection,
+  iceRestart: boolean,
+): Promise<void> {
+  const offer = await connection.createOffer({ iceRestart });
+  await connection.setLocalDescription(offer);
+  const localDescription = connection.localDescription;
+  if (!localDescription || localDescription.type !== 'offer' || !localDescription.sdp) {
+    throw new Error('Could not create a WebRTC offer');
+  }
+
+  const result = await relayWithAcknowledgment((acknowledge) => {
+    socket.emit(
+      'webrtc:description',
+      {
+        toParticipantId: peerId,
+        description: { type: 'offer', sdp: localDescription.sdp },
+      },
+      acknowledge,
+    );
+  });
+  if (!result.ok) {
+    throw new Error(`Signaling server rejected offer: ${result.error}`);
   }
 }
