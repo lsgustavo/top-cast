@@ -4,6 +4,7 @@ import type {
   RoomOperationResult,
   RoomParticipant,
   RoomSnapshot,
+  WebRtcSignalError,
 } from '../../shared/types/signaling.js';
 
 const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -140,6 +141,35 @@ export class RoomService {
 
     room.participants.delete(socketId);
     return { roomId, roomClosed: false, snapshot: this.toSnapshot(room) };
+  }
+
+  authorizeSignal(
+    fromSocketId: string,
+    toSocketId: string,
+    signalType: 'offer' | 'answer' | 'ice-candidate',
+  ): WebRtcSignalError | undefined {
+    const roomId = this.roomIdsBySocketId.get(fromSocketId);
+    if (!roomId) {
+      return 'NOT_IN_ROOM';
+    }
+
+    if (this.roomIdsBySocketId.get(toSocketId) !== roomId) {
+      return 'PEER_NOT_IN_ROOM';
+    }
+
+    const room = this.roomsById.get(roomId);
+    const sender = room?.participants.get(fromSocketId);
+    const receiver = room?.participants.get(toSocketId);
+    if (!sender || !receiver || sender.id === receiver.id) {
+      return 'PEER_NOT_IN_ROOM';
+    }
+
+    if (
+      (signalType === 'offer' && sender.role !== 'host') ||
+      (signalType === 'answer' && (sender.role !== 'guest' || receiver.role !== 'host'))
+    ) {
+      return 'NOT_ALLOWED';
+    }
   }
 
   expireRooms(now = Date.now()): string[] {

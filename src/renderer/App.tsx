@@ -5,12 +5,14 @@ import JoinRoomPage from './pages/JoinRoomPage';
 import RoomPage from './pages/RoomPage';
 import { createSignalingClient } from './lib/signaling-client';
 import type { RoomSnapshot } from '../shared/types/signaling';
+import { useRoomWebRtc } from './features/streaming/use-room-webrtc';
 
 export default function App() {
   const [page, setPage] = useState<'home' | 'create-room' | 'join-room' | 'room'>('home');
   const [socket] = useState(createSignalingClient);
   const [room, setRoom] = useState<RoomSnapshot | null>(null);
   const [homeNotice, setHomeNotice] = useState('');
+  const connectionStates = useRoomWebRtc(socket, room);
 
   useEffect(() => {
     const handleRoomUpdated = (updatedRoom: RoomSnapshot) => {
@@ -64,6 +66,7 @@ export default function App() {
       <RoomPage
         room={room}
         socket={socket}
+        connectionStates={connectionStates}
         onLeave={() => {
           setRoom(null);
           setPage('home');

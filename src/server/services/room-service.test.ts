@@ -100,4 +100,23 @@ describe('RoomService', () => {
       { ok: false, error: 'INVALID_CODE' },
     );
   });
+
+  it('authorizes WebRTC signaling only between participants in one room', () => {
+    const service = new RoomService();
+    const created = service.create('host', 'Host', 100);
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+    const joined = service.join('guest', created.room.inviteCode, 'Guest', 110);
+    assert.equal(joined.ok, true);
+    if (!joined.ok) return;
+    const otherRoom = service.create('other-host', 'Other host', 120);
+    assert.equal(otherRoom.ok, true);
+
+    assert.equal(service.authorizeSignal('host', 'guest', 'offer'), undefined);
+    assert.equal(service.authorizeSignal('guest', 'host', 'answer'), undefined);
+    assert.equal(service.authorizeSignal('host', 'guest', 'ice-candidate'), undefined);
+    assert.equal(service.authorizeSignal('guest', 'host', 'offer'), 'NOT_ALLOWED');
+    assert.equal(service.authorizeSignal('host', 'other-host', 'offer'), 'PEER_NOT_IN_ROOM');
+    assert.equal(service.authorizeSignal('not-a-member', 'guest', 'ice-candidate'), 'NOT_IN_ROOM');
+  });
 });

@@ -7,6 +7,8 @@ import {
   type InterServerEvents,
   type ServerToClientEvents,
   type SignalingSocketData,
+  type WebRtcDescriptionPayload,
+  type WebRtcIceCandidatePayload,
 } from '../shared/types/signaling.js';
 
 const host = process.env.SIGNALING_HOST ?? '127.0.0.1';
@@ -130,6 +132,70 @@ io.on('connection', (socket) => {
     acknowledge({ ok: true });
   });
 
+  socket.on('webrtc:description', (payload, acknowledge) => {
+    if (typeof acknowledge !== 'function') {
+      app.log.warn({ socketId: socket.id }, 'Rejected webrtc:description without acknowledgment callback');
+      return;
+    }
+
+    if (!isValidDescriptionPayload(payload)) {
+      acknowledge({ ok: false, error: 'INVALID_SIGNAL' });
+      return;
+    }
+
+    const error = roomService.authorizeSignal(
+      socket.id,
+      payload.toParticipantId,
+      payload.description.type,
+    );
+    if (error) {
+      acknowledge({ ok: false, error });
+      return;
+    }
+
+    app.log.info(
+      { fromParticipantId: socket.id, toParticipantId: payload.toParticipantId, type: payload.description.type },
+      'Relaying WebRTC session description',
+    );
+    io.to(payload.toParticipantId).emit('webrtc:description', {
+      fromParticipantId: socket.id,
+      description: payload.description,
+    });
+    acknowledge({ ok: true });
+  });
+
+  socket.on('webrtc:ice-candidate', (payload, acknowledge) => {
+    if (typeof acknowledge !== 'function') {
+      app.log.warn({ socketId: socket.id }, 'Rejected webrtc:ice-candidate without acknowledgment callback');
+      return;
+    }
+
+    if (!isValidIceCandidatePayload(payload)) {
+      acknowledge({ ok: false, error: 'INVALID_SIGNAL' });
+      return;
+    }
+
+    const error = roomService.authorizeSignal(
+      socket.id,
+      payload.toParticipantId,
+      'ice-candidate',
+    );
+    if (error) {
+      acknowledge({ ok: false, error });
+      return;
+    }
+
+    app.log.info(
+      { fromParticipantId: socket.id, toParticipantId: payload.toParticipantId },
+      'Relaying WebRTC ICE candidate',
+    );
+    io.to(payload.toParticipantId).emit('webrtc:ice-candidate', {
+      fromParticipantId: socket.id,
+      candidate: payload.candidate,
+    });
+    acknowledge({ ok: true });
+  });
+
   socket.on('disconnect', (reason) => {
     const result = roomService.leave(socket.id);
     if (result?.roomClosed) {
@@ -143,6 +209,44 @@ io.on('connection', (socket) => {
     app.log.info({ socketId: socket.id, reason }, 'Signaling client disconnected');
   });
 });
+
+function isValidDescriptionPayload(value: unknown): value is WebRtcDescriptionPayload {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const payload = value as Partial<WebRtcDescriptionPayload>;
+  const description = payload.description;
+  return (
+    typeof payload.toParticipantId === 'string' &&
+    payload.toParticipantId.length > 0 &&
+    typeof description === 'object' &&
+    description !== null &&
+    (description.type === 'offer' || description.type === 'answer') &&
+    typeof description.sdp === 'string' &&
+    description.sdp.length > 0 &&
+    description.sdp.length <= 256_000
+  );
+}
+
+function isValidIceCandidatePayload(value: unknown): value is WebRtcIceCandidatePayload {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const payload = value as Partial<WebRtcIceCandidatePayload>;
+  const candidate = payload.candidate;
+  return (
+    typeof payload.toParticipantId === 'string' &&
+    payload.toParticipantId.length > 0 &&
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    typeof candidate.candidate === 'string' &&
+    candidate.candidate.length <= 4_096 &&
+    (typeof candidate.sdpMid === 'string' || candidate.sdpMid === null) &&
+    (typeof candidate.sdpMLineIndex === 'number' || candidate.sdpMLineIndex === null)
+  );
+}
 
 function closeRoomSockets(roomId: string): void {
   for (const connectedSocket of io.sockets.sockets.values()) {

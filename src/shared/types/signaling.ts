@@ -53,10 +53,43 @@ export interface RoomClosedMessage {
   reason: 'host-left' | 'expired';
 }
 
+export interface WebRtcDescriptionPayload {
+  toParticipantId: string;
+  description: {
+    type: 'offer' | 'answer';
+    sdp: string;
+  };
+}
+
+export interface WebRtcIceCandidatePayload {
+  toParticipantId: string;
+  candidate: {
+    candidate: string;
+    sdpMid: string | null;
+    sdpMLineIndex: number | null;
+    usernameFragment?: string | null;
+  };
+}
+
+export interface WebRtcDescriptionMessage {
+  fromParticipantId: string;
+  description: WebRtcDescriptionPayload['description'];
+}
+
+export interface WebRtcIceCandidateMessage {
+  fromParticipantId: string;
+  candidate: WebRtcIceCandidatePayload['candidate'];
+}
+
+export type WebRtcSignalError = 'NOT_IN_ROOM' | 'PEER_NOT_IN_ROOM' | 'INVALID_SIGNAL' | 'NOT_ALLOWED';
+export type WebRtcSignalResult = { ok: true } | { ok: false; error: WebRtcSignalError };
+
 export interface ServerToClientEvents {
   'server:ready': (message: ServerReadyMessage) => void;
   'room:updated': (room: RoomSnapshot) => void;
   'room:closed': (message: RoomClosedMessage) => void;
+  'webrtc:description': (message: WebRtcDescriptionMessage) => void;
+  'webrtc:ice-candidate': (message: WebRtcIceCandidateMessage) => void;
 }
 
 export interface ClientToServerEvents {
@@ -70,6 +103,14 @@ export interface ClientToServerEvents {
     acknowledge: (result: RoomOperationResult) => void,
   ) => void;
   'room:leave': (acknowledge: (result: LeaveRoomResponse) => void) => void;
+  'webrtc:description': (
+    payload: WebRtcDescriptionPayload,
+    acknowledge: (result: WebRtcSignalResult) => void,
+  ) => void;
+  'webrtc:ice-candidate': (
+    payload: WebRtcIceCandidatePayload,
+    acknowledge: (result: WebRtcSignalResult) => void,
+  ) => void;
 }
 
 export interface InterServerEvents {}

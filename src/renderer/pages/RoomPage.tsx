@@ -2,14 +2,23 @@ import { useState } from 'react';
 import { Button } from '../components/ui/button';
 import type { RoomSnapshot } from '../../shared/types/signaling';
 import type { SignalingClient } from '../lib/signaling-client';
+import type { PeerConnectionStatus } from '../features/streaming/use-room-webrtc';
 
 interface RoomPageProps {
   room: RoomSnapshot;
   socket: SignalingClient;
+  connectionStates: Record<string, PeerConnectionStatus>;
   onLeave: () => void;
 }
 
-export default function RoomPage({ room, socket, onLeave }: RoomPageProps) {
+const connectionLabels: Record<PeerConnectionStatus, string> = {
+  connecting: 'Negociando WebRTC',
+  connected: 'WebRTC conectado',
+  disconnected: 'Conexão interrompida',
+  failed: 'Falha na conexão',
+};
+
+export default function RoomPage({ room, socket, connectionStates, onLeave }: RoomPageProps) {
   const [copyMessage, setCopyMessage] = useState('');
   const [isLeaving, setIsLeaving] = useState(false);
   const isHost = room.participants.some((participant) => participant.id === socket.id && participant.role === 'host');
@@ -75,6 +84,7 @@ export default function RoomPage({ room, socket, onLeave }: RoomPageProps) {
               </p>
             )}
             <p className="mt-3 text-xs text-slate-500">A captura de tela será habilitada em uma etapa posterior.</p>
+            <p className="mt-2 text-xs text-slate-600">Canal WebRTC de controle; ainda sem transmissão de mídia.</p>
           </section>
 
           <aside className="space-y-4">
@@ -97,7 +107,13 @@ export default function RoomPage({ room, socket, onLeave }: RoomPageProps) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-slate-100">{participant.displayName}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">{participant.role === 'host' ? 'Host' : 'Participante'}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {participant.id === socket.id
+                          ? participant.role === 'host' ? 'Você · Host' : 'Você'
+                          : connectionStates[participant.id]
+                            ? connectionLabels[connectionStates[participant.id]]
+                            : participant.role === 'host' ? 'Host · aguardando WebRTC' : 'Aguardando conexão WebRTC'}
+                      </p>
                     </div>
                     <span className="h-2 w-2 rounded-full bg-emerald-400" aria-label="Conectado" />
                   </li>
