@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Copy, Crown, LogOut, Mic, MicOff, Settings, Volume2, VolumeX } from 'lucide-react';
+import { AlertTriangle, Check, CircleAlert, Copy, Crown, LogOut, Mic, MicOff, Settings, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select';
 import {
@@ -175,6 +175,7 @@ export default function RoomPage({
   onLeave,
 }: RoomPageProps) {
   const [toastMessage, setToastMessage] = useState('');
+  const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
   const [isCopied, setIsCopied] = useState(false);
   const [participantActionError, setParticipantActionError] = useState('');
   const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
@@ -213,11 +214,16 @@ export default function RoomPage({
   }, []);
 
   async function handleCopyCode() {
+    let duration = 2_000;
     try {
       await navigator.clipboard.writeText(room.inviteCode);
       setIsCopied(true);
+      setToastTone('success');
       setToastMessage('Código copiado para a área de transferência!');
     } catch (error) {
+      duration = 4_500;
+      setIsCopied(false);
+      setToastTone('error');
       const message = error instanceof Error
         ? `Não foi possível copiar o código: ${error.message}`
         : 'Não foi possível copiar o código.';
@@ -227,7 +233,7 @@ export default function RoomPage({
     toastTimerRef.current = window.setTimeout(() => {
       setToastMessage('');
       setIsCopied(false);
-    }, 2_000);
+    }, duration);
   }
 
   async function openAudioSettings() {
@@ -412,7 +418,8 @@ export default function RoomPage({
             })}
           </ul>
           {participantActionError && (
-            <p role="alert" className="mt-2 w-fit max-w-full self-start break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2.5 py-2 text-xs leading-5 text-red-200">
+            <p role="alert" className="mt-2 inline-flex w-fit max-w-full self-start items-start gap-2 break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2.5 py-2 text-xs leading-5 text-red-200">
+              <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {participantActionError}
             </p>
           )}
@@ -465,7 +472,8 @@ export default function RoomPage({
               </Button>
             </div>
             {microphoneError && (
-              <p role="alert" className="mt-2 w-fit max-w-full break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2 py-1.5 text-xs leading-5 text-red-200">
+              <p role="alert" className="mt-2 inline-flex w-fit max-w-full items-start gap-2 break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2 py-1.5 text-xs leading-5 text-red-200">
+                <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {microphoneError}
               </p>
             )}
@@ -528,14 +536,23 @@ export default function RoomPage({
                     {isLeaving ? 'Encerrando…' : 'Encerrar Sala'}
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogTitle className="text-lg font-semibold">Encerrar sala?</AlertDialogTitle>
-                  <AlertDialogDescription className="mt-2 text-sm leading-6 text-slate-400">
-                    Tem certeza? Isso encerrará a sala e desconectará todos os participantes.
-                  </AlertDialogDescription>
-                  <div className="mt-6 flex justify-end gap-2">
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleLeave}>
+                <AlertDialogContent className="max-w-[440px] overflow-hidden p-0">
+                  <div className="flex gap-4 p-5 sm:p-6">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-red-400/20 bg-red-400/10 text-red-300">
+                      <AlertTriangle className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 pt-0.5">
+                      <AlertDialogTitle className="text-base font-semibold tracking-tight text-slate-100">
+                        Encerrar esta sala?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="mt-2 text-sm leading-6 text-slate-400">
+                        Todos os participantes serão desconectados e o convite deixará de funcionar. Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </div>
+                  </div>
+                  <div className="flex flex-col-reverse gap-2 border-t border-slate-800 bg-slate-950/30 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+                    <AlertDialogCancel className="w-full sm:w-auto">Manter sala</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleLeave} className="w-full sm:w-auto">
                       <LogOut className="h-4 w-4" />Encerrar sala
                     </AlertDialogAction>
                   </div>
@@ -609,7 +626,8 @@ export default function RoomPage({
               )}
 
               {captureError && isHost && (
-                <p role="alert" className="mt-4 w-fit max-w-full self-start break-words rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm text-red-200">
+                <p role="alert" className="mt-4 inline-flex w-fit max-w-full items-start gap-2 self-start break-words rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm text-red-200">
+                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                   {captureError}
                 </p>
               )}
@@ -656,7 +674,8 @@ export default function RoomPage({
               </SelectContent>
             </Select>
             {audioSettingsError && (
-              <p role="alert" className="mt-3 w-fit max-w-full break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2.5 py-2 text-xs leading-5 text-red-200">
+              <p role="alert" className="mt-3 inline-flex w-fit max-w-full items-start gap-2 break-words rounded-md border border-red-400/20 bg-red-400/[0.06] px-2.5 py-2 text-xs leading-5 text-red-200">
+                <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {audioSettingsError}
               </p>
             )}
@@ -794,11 +813,18 @@ export default function RoomPage({
 
       {toastMessage && (
         <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-5 right-5 z-[90] w-fit max-w-[min(22rem,calc(100vw-2.5rem))] break-words rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 shadow-2xl"
+          role={toastTone === 'error' ? 'alert' : 'status'}
+          aria-live={toastTone === 'error' ? 'assertive' : 'polite'}
+          className={`fixed right-4 top-4 z-[90] flex w-fit max-w-[min(24rem,calc(100vw-2rem))] items-start gap-2.5 break-words rounded-xl border px-4 py-3 text-sm shadow-2xl sm:right-6 sm:top-6 ${
+            toastTone === 'error'
+              ? 'border-red-400/25 bg-slate-900 text-red-100 shadow-red-950/20'
+              : 'border-slate-700 bg-slate-900 text-slate-100'
+          }`}
         >
-          {toastMessage}
+          {toastTone === 'error'
+            ? <CircleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
+            : <Check aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />}
+          <span className="min-w-0">{toastMessage}</span>
         </div>
       )}
     </main>

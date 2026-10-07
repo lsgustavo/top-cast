@@ -7,7 +7,7 @@ const AlertDialogPortal = AlertDialogPrimitive.Portal;
 
 const AlertDialogOverlay = ({ className, ...props }: AlertDialogPrimitive.AlertDialogOverlayProps) => (
   <AlertDialogPrimitive.Overlay
-    className={cn('fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out', className)}
+    className={cn('fixed inset-0 z-[80] bg-slate-950/75 opacity-0 backdrop-blur-sm transition-opacity duration-200 data-[state=open]:opacity-100 data-[state=closed]:opacity-0', className)}
     {...props}
   />
 );
@@ -16,7 +16,7 @@ const AlertDialogContent = ({ className, ...props }: AlertDialogPrimitive.AlertD
   <AlertDialogPortal>
     <AlertDialogOverlay />
     <AlertDialogPrimitive.Content
-      className={cn('fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-700 bg-slate-900 p-6 text-slate-100 shadow-2xl', className)}
+      className={cn('fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 scale-95 rounded-xl border border-slate-700 bg-slate-900 p-6 text-slate-100 opacity-0 shadow-[0_24px_80px_rgba(0,0,0,0.55)] outline-none transition duration-200 data-[state=open]:scale-100 data-[state=open]:opacity-100 data-[state=closed]:scale-95 data-[state=closed]:opacity-0', className)}
       {...props}
     />
   </AlertDialogPortal>
