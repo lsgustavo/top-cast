@@ -10,9 +10,10 @@ const api: TopCastApi = {
     chrome: process.versions.chrome,
   }),
   screenCapture: {
+    supportsSystemAudio: process.platform === 'win32',
     listSources: () => ipcRenderer.invoke('screen-capture:list-sources'),
-    selectSource: (sourceId: string | null) =>
-      ipcRenderer.invoke('screen-capture:select-source', sourceId),
+    selectSource: (sourceId: string | null, includeSystemAudio: boolean) =>
+      ipcRenderer.invoke('screen-capture:select-source', sourceId, includeSystemAudio),
   },
 };
 

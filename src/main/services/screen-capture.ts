@@ -17,6 +17,7 @@ const SOURCE_REFRESH_INTERVAL_MS = 30_000;
 let activeWindow: BrowserWindow | null = null;
 let availableSources = new Map<string, DesktopCapturerSource>();
 let selectedSourceId: string | null = null;
+let selectedSourceIncludesAudio = false;
 let sourcesUpdatedAt = 0;
 let selectionRequestId = 0;
 let handlersRegistered = false;
@@ -24,6 +25,7 @@ let handlersRegistered = false;
 export function configureScreenCapture(window: BrowserWindow): void {
   activeWindow = window;
   selectedSourceId = null;
+  selectedSourceIncludesAudio = false;
 
   if (handlersRegistered) {
     return;
@@ -40,12 +42,16 @@ export function configureScreenCapture(window: BrowserWindow): void {
 
   ipcMain.handle(
     SELECT_SOURCE_CHANNEL,
-    async (event, sourceId: unknown): Promise<CaptureSourceSelection> => {
+    async (event, sourceId: unknown, includeSystemAudio: unknown): Promise<CaptureSourceSelection> => {
       if (!event.senderFrame || !isAuthorizedSender(event.sender, event.senderFrame)) {
         return { ok: false, error: 'UNAUTHORIZED' };
       }
+      if (typeof includeSystemAudio !== 'boolean') {
+        return { ok: false, error: 'SOURCE_NOT_AVAILABLE' };
+      }
       const requestId = ++selectionRequestId;
       selectedSourceId = null;
+      selectedSourceIncludesAudio = false;
       if (sourceId === null) {
         return { ok: true };
       }
@@ -64,29 +70,79 @@ export function configureScreenCapture(window: BrowserWindow): void {
         return { ok: false, error: 'SOURCE_NOT_AVAILABLE' };
       }
       selectedSourceId = sourceId;
+      selectedSourceIncludesAudio = includeSystemAudio && process.platform === 'win32';
       return { ok: true };
     },
   );
 
+  const isAllowedMicrophoneRequest = (
+    webContents: Electron.WebContents | null,
+    origin: string | undefined,
+    isMainFrame: boolean,
+    mediaType: string | undefined,
+  ) => {
+    if (
+      !webContents ||
+      !activeWindow ||
+      activeWindow.isDestroyed() ||
+      webContents.id !== activeWindow.webContents.id ||
+      !isMainFrame ||
+      mediaType !== 'audio' ||
+      !origin
+    ) {
+      return false;
+    }
+    const rendererUrl = new URL(activeWindow.webContents.getURL());
+    if (rendererUrl.protocol === 'file:') {
+      return rendererUrl.pathname.toLowerCase().endsWith('/dist/index.html') &&
+        (origin === 'file://' || origin === 'null');
+    }
+    return rendererUrl.origin === 'http://localhost:4173' &&
+      origin === rendererUrl.origin;
+  };
+
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, origin, details) =>
+    permission === 'media' &&
+    isAllowedMicrophoneRequest(webContents, origin, details.isMainFrame, details.mediaType),
+  );
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const mediaTypes = 'mediaTypes' in details ? details.mediaTypes : undefined;
+    const securityOrigin = 'securityOrigin' in details ? details.securityOrigin : undefined;
+    callback(
+      permission === 'media' &&
+      mediaTypes?.length === 1 &&
+      mediaTypes[0] === 'audio' &&
+      isAllowedMicrophoneRequest(webContents, securityOrigin, true, 'audio'),
+    );
+  });
+
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     const source = selectedSourceId ? availableSources.get(selectedSourceId) : undefined;
+    const includeSystemAudio = selectedSourceIncludesAudio;
     const isAuthorizedFrame = request.frame !== null &&
       activeWindow !== null &&
       request.frame === activeWindow.webContents.mainFrame;
 
     selectedSourceId = null;
+    selectedSourceIncludesAudio = false;
     if (!source || !request.videoRequested || !isAuthorizedFrame) {
       callback(null);
       return;
     }
 
-    callback({ video: source });
+    callback({
+      video: source,
+      ...(includeSystemAudio && request.audioRequested && process.platform === 'win32'
+        ? { audio: 'loopback' as const }
+        : {}),
+    });
   }, { useSystemPicker: false });
 
   window.on('closed', () => {
     if (activeWindow === window) {
       activeWindow = null;
       selectedSourceId = null;
+      selectedSourceIncludesAudio = false;
     }
   });
 }

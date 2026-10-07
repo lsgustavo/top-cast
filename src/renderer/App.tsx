@@ -7,6 +7,7 @@ import { createSignalingClient } from './lib/signaling-client';
 import type { RoomSnapshot } from '../shared/types/signaling';
 import { useRoomWebRtc } from './features/streaming/use-room-webrtc';
 import { useScreenCapture } from './features/streaming/use-screen-capture';
+import { useMicrophone } from './features/streaming/use-microphone';
 
 export default function App() {
   const [page, setPage] = useState<'home' | 'create-room' | 'join-room' | 'room'>('home');
@@ -14,13 +15,20 @@ export default function App() {
   const [room, setRoom] = useState<RoomSnapshot | null>(null);
   const [homeNotice, setHomeNotice] = useState('');
   const screenCapture = useScreenCapture();
-  const { connectionStates, remoteStreams } = useRoomWebRtc(socket, room, screenCapture.stream);
+  const microphone = useMicrophone();
+  const { connectionStates, remoteStreams } = useRoomWebRtc(
+    socket,
+    room,
+    screenCapture.stream,
+    microphone.stream,
+  );
 
   useEffect(() => {
-    if (!room && screenCapture.stream) {
+    if (!room && (screenCapture.stream || microphone.stream)) {
       screenCapture.stopCapture();
+      microphone.disable();
     }
-  }, [room, screenCapture.stream, screenCapture.stopCapture]);
+  }, [room, screenCapture.stream, screenCapture.stopCapture, microphone.stream, microphone.disable]);
 
   useEffect(() => {
     const handleRoomUpdated = (updatedRoom: RoomSnapshot) => {
@@ -28,6 +36,7 @@ export default function App() {
     };
     const handleRoomClosed = ({ reason }: { reason: 'host-left' | 'expired' }) => {
       screenCapture.stopCapture();
+      microphone.disable();
       setRoom(null);
       setPage('home');
       setHomeNotice(reason === 'expired' ? 'A sala expirou.' : 'O host encerrou a sala.');
@@ -40,7 +49,7 @@ export default function App() {
       socket.off('room:closed', handleRoomClosed);
       socket.disconnect();
     };
-  }, [socket, screenCapture.stopCapture]);
+  }, [socket, screenCapture.stopCapture, microphone.disable]);
 
   if (page === 'create-room') {
     return (
@@ -83,13 +92,24 @@ export default function App() {
         isPreparingSource={screenCapture.isPreparingSource}
         isStartingCapture={screenCapture.isStartingCapture}
         preparedSourceId={screenCapture.preparedSourceId}
+        includeSystemAudio={screenCapture.includeSystemAudio}
+        supportsSystemAudio={screenCapture.supportsSystemAudio}
+        hasSystemAudio={screenCapture.hasSystemAudio}
+        systemAudioEnabled={screenCapture.systemAudioEnabled}
+        isMicrophoneEnabled={microphone.isEnabled}
+        isMicrophoneStarting={microphone.isStarting}
         captureError={screenCapture.error}
+        microphoneError={microphone.error}
         onLoadSources={screenCapture.loadSources}
         onPrepareSource={screenCapture.prepareSource}
         onStartCapture={screenCapture.startCapture}
         onStopCapture={screenCapture.stopCapture}
+        onToggleSystemAudio={screenCapture.setSystemAudioEnabled}
+        onToggleMicrophone={microphone.toggle}
+        onDisableMicrophone={microphone.disable}
         onLeave={() => {
           screenCapture.stopCapture();
+          microphone.disable();
           setRoom(null);
           setPage('home');
         }}

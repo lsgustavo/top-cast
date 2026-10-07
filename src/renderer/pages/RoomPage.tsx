@@ -16,11 +16,21 @@ interface RoomPageProps {
   isPreparingSource: boolean;
   isStartingCapture: boolean;
   preparedSourceId: string | null;
+  includeSystemAudio: boolean;
+  supportsSystemAudio: boolean;
+  hasSystemAudio: boolean;
+  systemAudioEnabled: boolean;
+  isMicrophoneEnabled: boolean;
+  isMicrophoneStarting: boolean;
   captureError: string | null;
+  microphoneError: string | null;
   onLoadSources: () => Promise<CaptureSource[]>;
-  onPrepareSource: (sourceId: string | null) => Promise<boolean>;
+  onPrepareSource: (sourceId: string | null, includeSystemAudio?: boolean) => Promise<boolean>;
   onStartCapture: () => Promise<boolean>;
   onStopCapture: () => void;
+  onToggleSystemAudio: (enabled: boolean) => void;
+  onToggleMicrophone: () => Promise<boolean>;
+  onDisableMicrophone: () => void;
   onLeave: () => void;
 }
 
@@ -77,11 +87,21 @@ export default function RoomPage({
   isPreparingSource,
   isStartingCapture,
   preparedSourceId,
+  includeSystemAudio,
+  supportsSystemAudio,
+  hasSystemAudio,
+  systemAudioEnabled,
+  isMicrophoneEnabled,
+  isMicrophoneStarting,
   captureError,
+  microphoneError,
   onLoadSources,
   onPrepareSource,
   onStartCapture,
   onStopCapture,
+  onToggleSystemAudio,
+  onToggleMicrophone,
+  onDisableMicrophone,
   onLeave,
 }: RoomPageProps) {
   const [copyMessage, setCopyMessage] = useState('');
@@ -109,21 +129,21 @@ export default function RoomPage({
 
   function openSourcePicker() {
     setSelectedSourceId(null);
-    void onPrepareSource(null);
+    void onPrepareSource(null, false);
     setIsSourcePickerOpen(true);
     void onLoadSources();
   }
 
   async function handleSelectSource(sourceId: string) {
     setSelectedSourceId(sourceId);
-    if (!await onPrepareSource(sourceId)) {
+    if (!await onPrepareSource(sourceId, includeSystemAudio)) {
       setSelectedSourceId(null);
     }
   }
 
   function closeSourcePicker() {
     setSelectedSourceId(null);
-    void onPrepareSource(null);
+    void onPrepareSource(null, false);
     setIsSourcePickerOpen(false);
   }
 
@@ -140,6 +160,7 @@ export default function RoomPage({
   function handleLeave() {
     setIsLeaving(true);
     onStopCapture();
+    onDisableMicrophone();
     socket.emit('room:leave', () => onLeave());
   }
 
@@ -241,6 +262,46 @@ export default function RoomPage({
               </ul>
             </section>
 
+            {isHost && (
+              <section aria-label="Controles de áudio" className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+                <h2 className="text-sm font-semibold text-slate-200">Áudio</h2>
+                <div className="mt-3 grid gap-2">
+                  <Button
+                    type="button"
+                    variant={systemAudioEnabled ? 'secondary' : 'outline'}
+                    disabled={!hasSystemAudio}
+                    aria-pressed={systemAudioEnabled}
+                    onClick={() => onToggleSystemAudio(!systemAudioEnabled)}
+                    className="justify-start border-slate-700 text-slate-200"
+                  >
+                    {systemAudioEnabled ? 'Áudio da transmissão ligado' : 'Áudio da transmissão desligado'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={isMicrophoneEnabled ? 'secondary' : 'outline'}
+                    disabled={isMicrophoneStarting}
+                    aria-pressed={isMicrophoneEnabled}
+                    onClick={() => void onToggleMicrophone()}
+                    className="justify-start border-slate-700 text-slate-200"
+                  >
+                    {isMicrophoneStarting
+                      ? 'Ativando microfone…'
+                      : isMicrophoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}
+                  </Button>
+                </div>
+                {microphoneError && (
+                  <p role="alert" className="mt-3 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-xs leading-5 text-red-200">
+                    {microphoneError}
+                  </p>
+                )}
+                {!supportsSystemAudio && (
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    A captura do áudio do sistema está disponível somente no Windows.
+                  </p>
+                )}
+              </section>
+            )}
+
             <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
               <h2 className="text-sm font-semibold text-slate-200">Código do convite</h2>
               <div className="mt-3 flex items-center justify-between gap-3">
@@ -277,7 +338,7 @@ export default function RoomPage({
             <header className="flex items-start justify-between border-b border-slate-800 px-5 py-4 sm:px-6">
               <div>
                 <h2 id="capture-dialog-title" className="text-lg font-semibold">Escolha o que compartilhar</h2>
-                <p className="mt-1 text-sm text-slate-400">Somente o vídeo da tela será capturado nesta etapa.</p>
+                <p className="mt-1 text-sm text-slate-400">Escolha também se deseja incluir áudio do Windows.</p>
               </div>
               <Button type="button" variant="ghost" size="icon" aria-label="Fechar" onClick={closeSourcePicker}>
                 <span aria-hidden="true" className="text-xl leading-none">×</span>
@@ -293,7 +354,7 @@ export default function RoomPage({
                   onClick={() => {
                     setSourceKind(kind);
                     setSelectedSourceId(null);
-                    void onPrepareSource(null);
+                    void onPrepareSource(null, includeSystemAudio);
                   }}
                   aria-pressed={sourceKind === kind}
                   className="text-slate-200"
@@ -345,6 +406,25 @@ export default function RoomPage({
                   </button>
                 ))}
               </div>
+              {supportsSystemAudio && (
+                <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-700 bg-slate-950/40 p-3.5">
+                  <input
+                    type="checkbox"
+                    checked={includeSystemAudio}
+                    disabled={isPreparingSource || isStartingCapture}
+                    onChange={(event) => {
+                      void onPrepareSource(selectedSourceId, event.currentTarget.checked);
+                    }}
+                    className="mt-0.5 accent-blue-500"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-slate-200">Incluir áudio do sistema</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-400">
+                      Captura a saída geral do Windows — inclusive áudio de chamadas e outros aplicativos.
+                    </span>
+                  </span>
+                </label>
+              )}
             </div>
 
             <footer className="flex flex-col-reverse gap-2 border-t border-slate-800 px-5 py-4 sm:flex-row sm:justify-between sm:px-6">
@@ -355,7 +435,12 @@ export default function RoomPage({
                 </Button>
                 <Button
                   type="button"
-                  disabled={!selectedSourceId || preparedSourceId !== selectedSourceId || isPreparingSource || isStartingCapture}
+                  disabled={
+                    !selectedSourceId ||
+                    preparedSourceId !== selectedSourceId ||
+                    isPreparingSource ||
+                    isStartingCapture
+                  }
                   onClick={() => void handleStartCapture()}
                   className="bg-blue-600 text-white hover:bg-blue-500"
                 >

@@ -8,6 +8,9 @@ interface ScreenCaptureState {
   isPreparingSource: boolean;
   isStartingCapture: boolean;
   preparedSourceId: string | null;
+  includeSystemAudio: boolean;
+  hasSystemAudio: boolean;
+  systemAudioEnabled: boolean;
   error: string | null;
 }
 
@@ -27,9 +30,14 @@ export function useScreenCapture() {
     isPreparingSource: false,
     isStartingCapture: false,
     preparedSourceId: null,
+    includeSystemAudio: false,
+    hasSystemAudio: false,
+    systemAudioEnabled: false,
     error: null,
   });
   const streamRef = useRef<MediaStream | null>(null);
+  const captureApi = window.topCast?.screenCapture;
+  const supportsSystemAudio = captureApi?.supportsSystemAudio ?? false;
 
   const stopCapture = useCallback(() => {
     const stream = streamRef.current;
@@ -39,7 +47,13 @@ export function useScreenCapture() {
         track.stop();
       }
     }
-    setState((current) => ({ ...current, stream: null, isStartingCapture: false }));
+    setState((current) => ({
+      ...current,
+      stream: null,
+      isStartingCapture: false,
+      hasSystemAudio: false,
+      systemAudioEnabled: false,
+    }));
   }, []);
 
   const loadSources = useCallback(async () => {
@@ -55,10 +69,16 @@ export function useScreenCapture() {
     }
   }, []);
 
-  const prepareSource = useCallback(async (sourceId: string | null): Promise<boolean> => {
+  const prepareSource = useCallback(async (
+    sourceId: string | null,
+    includeSystemAudio = false,
+  ): Promise<boolean> => {
     setState((current) => ({ ...current, isPreparingSource: true, error: null }));
     try {
-      const selection = await getScreenCaptureApi().selectSource(sourceId);
+      const selection = await getScreenCaptureApi().selectSource(
+        sourceId,
+        includeSystemAudio && supportsSystemAudio,
+      );
       if (!selection.ok) {
         throw new Error(
           selection.error === 'SOURCE_NOT_AVAILABLE'
@@ -70,6 +90,7 @@ export function useScreenCapture() {
       setState((current) => ({
         ...current,
         preparedSourceId: sourceId,
+        includeSystemAudio: includeSystemAudio && supportsSystemAudio,
         isPreparingSource: false,
         error: null,
       }));
@@ -80,11 +101,12 @@ export function useScreenCapture() {
         ...current,
         isPreparingSource: false,
         preparedSourceId: null,
+        includeSystemAudio: false,
         error: message,
       }));
       return false;
     }
-  }, []);
+  }, [supportsSystemAudio]);
 
   const startCapture = useCallback(async (): Promise<boolean> => {
     if (!state.preparedSourceId) {
@@ -104,23 +126,44 @@ export function useScreenCapture() {
           width: { ideal: 1280, max: 1280 },
           height: { ideal: 720, max: 720 },
         },
-        audio: false,
+        audio: state.includeSystemAudio,
       });
       const [videoTrack] = stream.getVideoTracks();
       if (!videoTrack) {
         stream.getTracks().forEach((track) => track.stop());
         throw new Error('O Electron não retornou uma faixa de vídeo para a captura.');
       }
+      const systemAudioTrack = stream.getAudioTracks()[0] ?? null;
 
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = stream;
       videoTrack.addEventListener('ended', () => {
         if (streamRef.current === stream) {
           streamRef.current = null;
-          setState((current) => ({ ...current, stream: null, isStartingCapture: false }));
+          setState((current) => ({
+            ...current,
+            stream: null,
+            isStartingCapture: false,
+            hasSystemAudio: false,
+            systemAudioEnabled: false,
+          }));
         }
       }, { once: true });
-      setState((current) => ({ ...current, stream, isStartingCapture: false, error: null }));
+      systemAudioTrack?.addEventListener('ended', () => {
+        setState((current) => ({
+          ...current,
+          hasSystemAudio: false,
+          systemAudioEnabled: false,
+        }));
+      }, { once: true });
+      setState((current) => ({
+        ...current,
+        stream,
+        isStartingCapture: false,
+        hasSystemAudio: systemAudioTrack !== null,
+        systemAudioEnabled: systemAudioTrack !== null,
+        error: null,
+      }));
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Não foi possível iniciar o compartilhamento de tela.';
@@ -128,11 +171,26 @@ export function useScreenCapture() {
         ...current,
         isStartingCapture: false,
         preparedSourceId: null,
+        includeSystemAudio: false,
         error: message,
       }));
       return false;
     }
-  }, [state.preparedSourceId]);
+  }, [state.includeSystemAudio, state.preparedSourceId]);
+
+  const setSystemAudioEnabled = useCallback((enabled: boolean) => {
+    const track = streamRef.current?.getAudioTracks()[0];
+    if (!track || track.readyState !== 'live') {
+      setState((current) => ({
+        ...current,
+        hasSystemAudio: false,
+        systemAudioEnabled: false,
+      }));
+      return;
+    }
+    track.enabled = enabled;
+    setState((current) => ({ ...current, systemAudioEnabled: enabled }));
+  }, []);
 
   useEffect(() => () => {
     const stream = streamRef.current;
@@ -142,10 +200,12 @@ export function useScreenCapture() {
 
   return {
     ...state,
+    supportsSystemAudio,
     isSharing: state.stream !== null,
     loadSources,
     prepareSource,
     startCapture,
     stopCapture,
+    setSystemAudioEnabled,
   };
 }

@@ -18,8 +18,9 @@ export type CaptureSourceSelection =
   | { ok: false; error: 'SOURCE_NOT_AVAILABLE' | 'UNAUTHORIZED' };
 
 export interface ScreenCaptureApi {
+  supportsSystemAudio: boolean;
   listSources: () => Promise<CaptureSource[]>;
-  selectSource: (sourceId: string | null) => Promise<CaptureSourceSelection>;
+  selectSource: (sourceId: string | null, includeSystemAudio: boolean) => Promise<CaptureSourceSelection>;
 }
 
 export interface TopCastApi {
