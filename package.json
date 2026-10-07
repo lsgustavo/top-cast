@@ -10,6 +10,7 @@
     "dev:electron": "tsc -p tsconfig.node.json && wait-on tcp:4173 tcp:3001 && electron dist-electron/main/main.js",
     "build": "tsc -p tsconfig.node.json && tsc -p tsconfig.server.json && tsc -p tsconfig.app.json && vite build",
     "build:windows": "npm run build && node scripts/verify-production-build.mjs",
+    "build:installer": "npm run build:windows && electron-builder --win nsis --x64",
     "verify:production": "node scripts/verify-production-build.mjs",
     "preview": "vite preview --host",
     "test": "tsx --test src/server/services/room-service.test.ts src/server/services/signaling-validation.test.ts"
@@ -42,11 +43,45 @@
     "autoprefixer": "^10.6.1",
     "concurrently": "^10.0.5",
     "electron": "^44.6.0",
+    "electron-builder": "^26.7.0",
+    "electron-builder": "^26.15.3",
     "postcss": "^8.5.29",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.3",
     "wait-on": "^9.5.1"
+  },
+  "build": {
+    "appId": "com.topcast.desktop",
+    "productName": "TopCast",
+    "electronDist": "node_modules/electron/dist",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "dist-server/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "TopCast-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TopCast"
+    }
   }
 }
