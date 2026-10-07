@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button';
+import { formatRoomTimeRemaining, getParticipantAvatarHue, getParticipantInitials } from '../lib/room-ui';
 import type { RoomSnapshot } from '../../shared/types/signaling';
 import type { CaptureSource } from '../../shared/types/desktop-api';
 import type { SignalingStatus } from '../../shared/types/signaling';
@@ -121,7 +122,11 @@ export default function RoomPage({
   onLeave,
 }: RoomPageProps) {
   const [copyMessage, setCopyMessage] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
+  const [participantActionError, setParticipantActionError] = useState('');
   const [isLeaving, setIsLeaving] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  const toastTimerRef = useRef<number | null>(null);
   const [isSourcePickerOpen, setIsSourcePickerOpen] = useState(false);
   const [sourceKind, setSourceKind] = useState<CaptureSource['kind']>('screen');
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
@@ -139,13 +144,59 @@ export default function RoomPage({
     restoring: 'Restaurando sala…',
   };
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => {
+      window.clearInterval(timer);
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
   async function handleCopyCode() {
     try {
       await navigator.clipboard.writeText(room.inviteCode);
       setCopyMessage('Código copiado.');
+      setToastMessage('Código copiado!');
     } catch (error) {
       setCopyMessage(error instanceof Error ? `Não foi possível copiar: ${error.message}` : 'Não foi possível copiar o código.');
+      setToastMessage('Não foi possível copiar o código.');
+    } finally {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+      toastTimerRef.current = window.setTimeout(() => setToastMessage(''), 3_000);
     }
+  }
+
+  function handlePresenceChange(value: string) {
+    if (value !== 'available' && value !== 'away' && value !== 'busy') {
+      setParticipantActionError('Estado de presença inválido.');
+      return;
+    }
+    setParticipantActionError('');
+    socket.emit('room:presence', { presence: value }, (result) => {
+      if (!result.ok) {
+        setParticipantActionError('Não foi possível atualizar seu estado de presença.');
+      }
+    });
+  }
+
+  function handleKick(participantId: string, displayName: string) {
+    if (!window.confirm(`Remover ${displayName} da sala?`)) {
+      return;
+    }
+    setParticipantActionError('');
+    socket.emit('room:kick', { participantId }, (result) => {
+      if (!result.ok) {
+        setParticipantActionError(
+          result.error === 'NOT_HOST'
+            ? 'Somente o host pode remover participantes.'
+            : 'Não foi possível remover esse participante.',
+        );
+      }
+    });
   }
 
   function openSourcePicker() {
@@ -276,17 +327,24 @@ export default function RoomPage({
                   const connectionLabel = isSelf
                     ? signalingStatus === 'connected' ? 'Sinalização conectada' : signalingStatus === 'restoring' ? 'Restaurando sala' : 'Reconectando sinalização'
                     : peerStatus ? connectionLabels[peerStatus] : 'Aguardando conexão WebRTC';
+                  const initials = getParticipantInitials(participant.displayName);
+                  const avatarHue = getParticipantAvatarHue(participant.displayName);
 
                   return (
                     <li key={participant.id} className="flex items-center gap-3 rounded-xl bg-slate-950/40 p-3">
-                      <div className={`grid h-10 w-10 place-items-center rounded-full ${participant.role === 'host' ? 'bg-blue-500/15 text-blue-200' : 'bg-slate-800 text-slate-300'}`}>
-                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-                          <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.6" />
-                          <path d="M5.5 20c.5-3.4 2.7-5.2 6.5-5.2s6 1.8 6.5 5.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                        </svg>
+                      <div
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-semibold text-white"
+                        style={{ backgroundColor: `hsl(${avatarHue} 42% 36%)` }}
+                        aria-label={`Avatar de ${participant.displayName}`}
+                      >
+                        {initials}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-100">{participant.displayName}</p>
+                        <p className="flex items-center gap-1.5 truncate text-sm font-medium text-slate-100">
+                          {participant.role === 'host' && <CrownIcon />}
+                          <span className="truncate">{participant.displayName}</span>
+                          {isSelf && <span className="shrink-0 text-xs font-normal text-blue-300">Você</span>}
+                        </p>
                         <p className="mt-0.5 text-xs text-slate-500">
                           {isSelf
                             ? participant.role === 'host' ? 'Você · Host' : 'Você'
@@ -295,16 +353,54 @@ export default function RoomPage({
                         <p className={`mt-1 text-xs ${participant.microphoneEnabled ? 'text-emerald-300' : 'text-slate-500'}`}>
                           {participant.microphoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}
                         </p>
+                        {isSelf && (
+                          <label className="mt-2 block">
+                            <span className="sr-only">Seu estado de presença</span>
+                            <select
+                              value={participant.presence}
+                              onChange={(event) => handlePresenceChange(event.currentTarget.value)}
+                              className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-300 outline-none focus:border-blue-400"
+                            >
+                              <option value="available">Disponível</option>
+                              <option value="away">Ausente</option>
+                              <option value="busy">Ocupado</option>
+                            </select>
+                          </label>
+                        )}
                       </div>
                       <span
-                        className={`h-2 w-2 rounded-full ${connectionIndicatorClasses[connectionStatus]}`}
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          isSelf
+                            ? participant.presence === 'available'
+                              ? 'bg-emerald-400'
+                              : participant.presence === 'away' ? 'bg-amber-300' : 'bg-red-400'
+                            : connectionIndicatorClasses[connectionStatus]
+                        }`}
                         role="img"
-                        aria-label={connectionLabel}
+                        aria-label={isSelf ? `Presença ${participant.presence}` : connectionLabel}
                       />
+                      {isHost && !isSelf && participant.role !== 'host' && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Remover ${participant.displayName}`}
+                          title={`Remover ${participant.displayName}`}
+                          onClick={() => handleKick(participant.id, participant.displayName)}
+                          className="h-8 w-8 shrink-0 text-slate-500 hover:bg-red-400/10 hover:text-red-200"
+                        >
+                          <span aria-hidden="true">×</span>
+                        </Button>
+                      )}
                     </li>
                   );
                 })}
               </ul>
+              {participantActionError && (
+                <p role="alert" className="mt-3 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs text-red-200">
+                  {participantActionError}
+                </p>
+              )}
             </section>
 
             {isHost && (
@@ -357,6 +453,9 @@ export default function RoomPage({
               </div>
               <p aria-live="polite" className="mt-2 min-h-4 text-xs text-slate-400">{copyMessage}</p>
               <p className="mt-1 text-xs text-slate-500">Válido até {new Date(room.expiresAt).toLocaleString()}</p>
+              <p className="mt-2 inline-flex rounded-full border border-blue-400/15 bg-blue-400/[0.06] px-2.5 py-1 text-xs font-medium text-blue-200">
+                {formatRoomTimeRemaining(room.expiresAt, now)}
+              </p>
             </section>
 
             <Button
@@ -496,6 +595,24 @@ export default function RoomPage({
           </section>
         </div>
       )}
+
+      {toastMessage && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed right-5 top-5 z-[60] rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 shadow-2xl"
+        >
+          {toastMessage}
+        </div>
+      )}
     </main>
+  );
+}
+
+function CrownIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 shrink-0 text-amber-300">
+      <path d="m3 6 3.1 2.3L10 3l3.9 5.3L17 6l-1.3 9H4.3L3 6Zm2 10h10v1H5v-1Z" />
+    </svg>
   );
 }

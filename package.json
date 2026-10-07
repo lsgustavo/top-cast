@@ -14,7 +14,7 @@
     "verify:production": "node scripts/verify-production-build.mjs",
     "test:signaling-smoke": "node scripts/smoke-test-signaling.mjs",
     "preview": "vite preview --host",
-    "test": "tsx --test src/server/services/room-service.test.ts src/server/services/signaling-validation.test.ts src/server/services/ice-credentials.test.ts tests/ice-configuration.test.ts tests/reconnect-identity.test.ts"
+    "test": "tsx --test src/server/services/room-service.test.ts src/server/services/signaling-validation.test.ts src/server/services/ice-credentials.test.ts tests/ice-configuration.test.ts tests/reconnect-identity.test.ts tests/room-ui.test.ts"
   },
   "keywords": [
     "electron",

@@ -58,8 +58,9 @@ alheios ao escopo nesses commits.
   estado global em tempo real, expulsão e transferência de host em desconexão.
 - [x] Solicitar nome de exibição na tela inicial e refletir disponibilidade
   global no botão de criar sala.
-- [ ] Adicionar timer de expiração, feedback de cópia, badges/avatar local,
-  presença e sons de entrada/saída.
+- [x] Adicionar timer de expiração, feedback de cópia, badges/avatar local e
+  presença.
+- [ ] Sons sutis de entrada/saída.
 - [ ] Adicionar atalho global e notificação nativa por novo participante.
 - [ ] Cobrir todas as funções com testes e commits isolados.
 
