@@ -8,8 +8,8 @@ export type SignalingClient = Socket<ServerToClientEvents, ClientToServerEvents>
 
 const signalingUrl = import.meta.env.VITE_SIGNALING_URL ?? 'http://127.0.0.1:3001';
 
-export function createSignalingClient(): SignalingClient {
-  return io(signalingUrl, {
+export function createSignalingClient(url = signalingUrl): SignalingClient {
+  return io(url, {
     autoConnect: false,
     reconnection: true,
     reconnectionAttempts: Infinity,

@@ -13,6 +13,15 @@ import {
 
 const host = process.env.SIGNALING_HOST ?? '127.0.0.1';
 const port = Number(process.env.SIGNALING_PORT ?? 3001);
+const allowedOrigins = new Set([
+  'http://localhost:4173',
+  'http://127.0.0.1:4173',
+  'null',
+  ...(process.env.SIGNALING_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+]);
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error(`Invalid SIGNALING_PORT: ${process.env.SIGNALING_PORT}`);
@@ -26,7 +35,13 @@ const io = new Server<
   SignalingSocketData
 >(app.server, {
   cors: {
-    origin: ['http://localhost:4173', 'http://127.0.0.1:4173'],
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Signaling CORS origin is not allowed: ${origin}`), false);
+    },
     methods: ['GET', 'POST'],
   },
 });

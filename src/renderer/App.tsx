@@ -16,9 +16,17 @@ interface ReconnectIdentity {
   role: 'host' | 'guest';
 }
 
+const SIGNALING_URL_STORAGE_KEY = 'topcast:signaling-url';
+const DEFAULT_SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL ?? 'http://127.0.0.1:3001';
+
+function getSavedSignalingUrl(): string {
+  return window.localStorage.getItem(SIGNALING_URL_STORAGE_KEY) ?? DEFAULT_SIGNALING_URL;
+}
+
 export default function App() {
   const [page, setPage] = useState<'home' | 'create-room' | 'join-room' | 'room'>('home');
-  const [socket] = useState(createSignalingClient);
+  const [signalingServerUrl, setSignalingServerUrl] = useState(getSavedSignalingUrl);
+  const [socket, setSocket] = useState(() => createSignalingClient(signalingServerUrl));
   const [room, setRoom] = useState<RoomSnapshot | null>(null);
   const [homeNotice, setHomeNotice] = useState('');
   const [signalingStatus, setSignalingStatus] = useState<SignalingStatus>('connected');
@@ -30,6 +38,21 @@ export default function App() {
   const reconnectIdentityRef = useRef<ReconnectIdentity | null>(null);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   roomRef.current = room;
+
+  function applySignalingServer(url: string) {
+    setSignalingServerUrl(url);
+    setSocket(createSignalingClient(url));
+    try {
+      window.localStorage.setItem(SIGNALING_URL_STORAGE_KEY, url);
+      setHomeNotice('Endereço do servidor atualizado.');
+    } catch (error) {
+      setHomeNotice(
+        error instanceof Error
+          ? `Servidor atualizado, mas não foi possível salvar a configuração: ${error.message}`
+          : 'Servidor atualizado, mas não foi possível salvar a configuração.',
+      );
+    }
+  }
   const { connectionStates, remoteStreams } = useRoomWebRtc(
     socket,
     room,
@@ -242,6 +265,8 @@ export default function App() {
   return (
     <HomePage
       notice={homeNotice}
+      signalingServerUrl={signalingServerUrl}
+      onApplySignalingServer={applySignalingServer}
       onCreateRoom={() => {
         setHomeNotice('');
         setPage('create-room');

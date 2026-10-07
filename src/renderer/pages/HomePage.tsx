@@ -1,3 +1,4 @@
+import { useEffect, useState, type FormEvent } from 'react';
 import { Button } from '../components/ui/button';
 import { APP_NAME } from '../../shared/constants/app';
 
@@ -36,11 +37,47 @@ function ActionIcon({ action }: { action: 'create' | 'join' }) {
 
 interface HomePageProps {
   notice: string;
+  signalingServerUrl: string;
+  onApplySignalingServer: (url: string) => void;
   onCreateRoom: () => void;
   onJoinRoom: () => void;
 }
 
-export default function HomePage({ notice, onCreateRoom, onJoinRoom }: HomePageProps) {
+export default function HomePage({
+  notice,
+  signalingServerUrl,
+  onApplySignalingServer,
+  onCreateRoom,
+  onJoinRoom,
+}: HomePageProps) {
+  const [serverInput, setServerInput] = useState(signalingServerUrl);
+  const [serverError, setServerError] = useState('');
+
+  useEffect(() => setServerInput(signalingServerUrl), [signalingServerUrl]);
+
+  function handleServerSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const url = new URL(serverInput.trim());
+      if (
+        !['http:', 'https:'].includes(url.protocol) ||
+        url.username ||
+        url.password ||
+        url.pathname !== '/' ||
+        url.search ||
+        url.hash
+      ) {
+        throw new Error('Informe um endereço HTTP(S) com host e porta, sem caminho adicional.');
+      }
+      setServerError('');
+      onApplySignalingServer(url.origin);
+    } catch (error) {
+      setServerError(error instanceof Error
+        ? error.message
+        : 'Informe um endereço válido, como http://192.168.1.20:3001.');
+    }
+  }
+
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1020] px-5 py-10 text-slate-50 sm:px-8">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.13),transparent_48%)]" />
@@ -104,6 +141,35 @@ export default function HomePage({ notice, onCreateRoom, onJoinRoom }: HomePageP
             </svg>
           </Button>
         </section>
+
+        <form
+          aria-label="Servidor de salas"
+          onSubmit={handleServerSubmit}
+          className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
+        >
+          <label htmlFor="signaling-server" className="block text-xs font-medium text-slate-300">
+            Endereço do servidor de salas
+          </label>
+          <div className="mt-2 flex gap-2">
+            <input
+              id="signaling-server"
+              type="url"
+              required
+              value={serverInput}
+              onChange={(event) => setServerInput(event.currentTarget.value)}
+              placeholder="http://192.168.1.20:3001"
+              autoComplete="url"
+              className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-blue-400"
+            />
+            <Button type="submit" variant="secondary" size="sm">Aplicar</Button>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            Para uma rede local, use o endereço IP do computador que executa o servidor.
+          </p>
+          {serverError && (
+            <p role="alert" className="mt-2 text-xs text-red-200">{serverError}</p>
+          )}
+        </form>
 
         {notice && (
           <p role="status" className="mt-4 rounded-xl border border-amber-300/15 bg-amber-300/[0.05] px-4 py-3 text-center text-sm text-amber-100">
