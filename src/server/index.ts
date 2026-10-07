@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { Server } from 'socket.io';
 import { RoomService } from './services/room-service.js';
+import { isValidDescriptionPayload, isValidIceCandidatePayload } from './services/signaling-validation.js';
 import {
   SIGNALING_PROTOCOL_VERSION,
   type ClientToServerEvents,
@@ -8,8 +9,6 @@ import {
   type MicrophoneStateResult,
   type ServerToClientEvents,
   type SignalingSocketData,
-  type WebRtcDescriptionPayload,
-  type WebRtcIceCandidatePayload,
 } from '../shared/types/signaling.js';
 
 const host = process.env.SIGNALING_HOST ?? '127.0.0.1';
@@ -232,44 +231,6 @@ io.on('connection', (socket) => {
     app.log.info({ socketId: socket.id, reason }, 'Signaling client disconnected');
   });
 });
-
-function isValidDescriptionPayload(value: unknown): value is WebRtcDescriptionPayload {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-
-  const payload = value as Partial<WebRtcDescriptionPayload>;
-  const description = payload.description;
-  return (
-    typeof payload.toParticipantId === 'string' &&
-    payload.toParticipantId.length > 0 &&
-    typeof description === 'object' &&
-    description !== null &&
-    (description.type === 'offer' || description.type === 'answer') &&
-    typeof description.sdp === 'string' &&
-    description.sdp.length > 0 &&
-    description.sdp.length <= 256_000
-  );
-}
-
-function isValidIceCandidatePayload(value: unknown): value is WebRtcIceCandidatePayload {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-
-  const payload = value as Partial<WebRtcIceCandidatePayload>;
-  const candidate = payload.candidate;
-  return (
-    typeof payload.toParticipantId === 'string' &&
-    payload.toParticipantId.length > 0 &&
-    typeof candidate === 'object' &&
-    candidate !== null &&
-    typeof candidate.candidate === 'string' &&
-    candidate.candidate.length <= 4_096 &&
-    (typeof candidate.sdpMid === 'string' || candidate.sdpMid === null) &&
-    (typeof candidate.sdpMLineIndex === 'number' || candidate.sdpMLineIndex === null)
-  );
-}
 
 function closeRoomSockets(roomId: string): void {
   for (const connectedSocket of io.sockets.sockets.values()) {

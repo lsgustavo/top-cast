@@ -61,6 +61,28 @@ describe('RoomService', () => {
     );
   });
 
+  it('validates participant names and prevents a socket joining twice', () => {
+    const service = new RoomService();
+    assert.deepEqual(service.create('invalid-host', '   ', 1), { ok: false, error: 'INVALID_NAME' });
+    assert.deepEqual(
+      service.create('long-name-host', 'x'.repeat(33), 1),
+      { ok: false, error: 'INVALID_NAME' },
+    );
+    const created = service.create('host', ' Host ', 10);
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+
+    assert.deepEqual(service.create('host', 'Host again', 11), { ok: false, error: 'ALREADY_IN_ROOM' });
+    const joined = service.join('guest', created.room.inviteCode, ' Guest ', 12);
+    assert.equal(joined.ok, true);
+    if (!joined.ok) return;
+    assert.equal(joined.room.participants[1]?.displayName, 'Guest');
+    assert.deepEqual(
+      service.join('guest', created.room.inviteCode, 'Guest again', 13),
+      { ok: false, error: 'ALREADY_IN_ROOM' },
+    );
+  });
+
   it('removes guests on leave and closes the room when the host leaves', () => {
     const service = new RoomService();
     const created = service.create('host', 'Host', 100);
@@ -136,5 +158,23 @@ describe('RoomService', () => {
     assert.equal(updated?.participants.find((participant) => participant.id === 'guest')?.microphoneEnabled, true);
     assert.equal(updated?.participants.find((participant) => participant.id === 'host')?.microphoneEnabled, false);
     assert.equal(service.setMicrophoneEnabled('outsider', true), undefined);
+  });
+
+  it('allows a disconnected guest to rejoin by invite with microphone off', () => {
+    const service = new RoomService();
+    const created = service.create('host', 'Host', 100);
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+    const joined = service.join('first-guest-socket', created.room.inviteCode, 'Guest', 110);
+    assert.equal(joined.ok, true);
+    if (!joined.ok) return;
+
+    service.setMicrophoneEnabled('first-guest-socket', true);
+    service.leave('first-guest-socket', 120);
+    const rejoined = service.join('reconnected-guest-socket', created.room.inviteCode, 'Guest', 130);
+    assert.equal(rejoined.ok, true);
+    if (!rejoined.ok) return;
+    assert.equal(rejoined.room.participants.at(-1)?.id, 'reconnected-guest-socket');
+    assert.equal(rejoined.room.participants.at(-1)?.microphoneEnabled, false);
   });
 });
