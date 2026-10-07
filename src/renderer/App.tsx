@@ -84,6 +84,21 @@ export default function App() {
   }, [room, screenCapture.stream, screenCapture.stopCapture, microphone.stream, microphone.disable]);
 
   useEffect(() => {
+    const self = room?.participants.find((participant) => participant.id === socket.id);
+    if (self?.role !== 'host' && (screenCapture.stream || microphone.stream)) {
+      screenCapture.stopCapture();
+      microphone.disable();
+    }
+  }, [
+    room,
+    socket.id,
+    screenCapture.stream,
+    screenCapture.stopCapture,
+    microphone.stream,
+    microphone.disable,
+  ]);
+
+  useEffect(() => {
     const handleRoomUpdated = (updatedRoom: RoomSnapshot) => {
       const changes = getParticipantChanges(roomRef.current, updatedRoom);
       if (changes.joined.length > 0) {
