@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Check, CircleAlert, Copy, Crown, LogOut, Volume2, VolumeX } from 'lucide-react';
+import {
+  AlertTriangle,
+  AppWindow,
+  Check,
+  CircleAlert,
+  Copy,
+  Crown,
+  LogOut,
+  Monitor,
+  RefreshCw,
+  Volume2,
+  VolumeX,
+  X,
+} from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select';
 import {
@@ -528,86 +541,145 @@ export default function RoomPage({
       </div>
 
       {isSourcePickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-md sm:p-6">
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="capture-dialog-title"
-            className="flex max-h-[min(760px,90vh)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50"
+            className="flex max-h-[min(820px,94vh)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-700/80 bg-[#0f172a] text-slate-100 shadow-[0_32px_100px_rgba(0,0,0,0.65)]"
           >
-            <header className="flex items-start justify-between border-b border-slate-800 px-5 py-4 sm:px-6">
-              <div>
-                <h2 id="capture-dialog-title" className="text-lg font-semibold">Escolha o que compartilhar</h2>
-                <p className="mt-1 text-sm text-slate-400">Escolha também se deseja incluir áudio do Windows.</p>
+            <header className="flex items-start justify-between gap-4 border-b border-slate-800/80 px-5 py-5 sm:px-7">
+              <div className="flex min-w-0 items-start gap-3.5">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-300">
+                  <ScreenIcon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h2 id="capture-dialog-title" className="text-base font-semibold tracking-tight sm:text-lg">Escolha o que compartilhar</h2>
+                  <p className="mt-1 text-sm leading-5 text-slate-400">
+                    Selecione uma tela ou janela para transmitir à sala.
+                  </p>
+                </div>
               </div>
-              <Button type="button" variant="ghost" size="icon" aria-label="Fechar" onClick={closeSourcePicker}>
-                <span aria-hidden="true" className="text-xl leading-none">×</span>
+              <Button type="button" variant="ghost" size="icon" aria-label="Fechar" onClick={closeSourcePicker} className="h-8 w-8 shrink-0 text-slate-400 hover:text-slate-100">
+                <X className="h-4 w-4" />
               </Button>
             </header>
 
-            <div className="flex gap-2 border-b border-slate-800 px-5 py-3 sm:px-6">
-              {(['screen', 'window'] as const).map((kind) => (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 px-5 py-3 sm:px-7">
+              <div role="group" aria-label="Tipo de origem" className="inline-flex rounded-lg border border-slate-700/70 bg-slate-950/70 p-1">
+                {(['screen', 'window'] as const).map((kind) => {
+                  const isScreen = kind === 'screen';
+                  const isActive = sourceKind === kind;
+                  const SourceIcon = isScreen ? Monitor : AppWindow;
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => {
+                        setSourceKind(kind);
+                        setSelectedSourceId(null);
+                        void onPrepareSource(null, includeSystemAudio);
+                      }}
+                      aria-pressed={isActive}
+                      className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-slate-800 text-slate-100 shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <SourceIcon className="h-4 w-4" />
+                      {isScreen ? 'Monitores' : 'Janelas'}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs tabular-nums text-slate-500">
+                  {filteredSources.length} {sourceKind === 'screen'
+                    ? filteredSources.length === 1 ? 'monitor' : 'monitores'
+                    : filteredSources.length === 1 ? 'janela' : 'janelas'}
+                </span>
                 <Button
-                  key={kind}
                   type="button"
-                  variant={sourceKind === kind ? 'secondary' : 'ghost'}
-                  onClick={() => {
-                    setSourceKind(kind);
-                    setSelectedSourceId(null);
-                    void onPrepareSource(null, includeSystemAudio);
-                  }}
-                  aria-pressed={sourceKind === kind}
-                  className="text-slate-200"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isLoadingSources}
+                  onClick={() => void onLoadSources()}
+                  className="h-9 gap-2 px-3 text-slate-300 hover:bg-slate-800 hover:text-white"
                 >
-                  {kind === 'screen' ? 'Monitores' : 'Janelas'}
+                  <RefreshCw className={`h-3.5 w-3.5 ${isLoadingSources ? 'animate-spin' : ''}`} />
+                  Atualizar
                 </Button>
-              ))}
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={isLoadingSources}
-                onClick={() => void onLoadSources()}
-                className="ml-auto text-slate-400"
-              >
-                {isLoadingSources ? 'Atualizando…' : 'Atualizar'}
-              </Button>
+              </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
-              {isLoadingSources && captureSources.length === 0 && (
-                <p role="status" className="py-12 text-center text-sm text-slate-400">Buscando monitores e janelas…</p>
-              )}
-              {!isLoadingSources && filteredSources.length === 0 && (
-                <p className="py-12 text-center text-sm text-slate-400">
-                  Nenhuma {sourceKind === 'screen' ? 'tela' : 'janela'} disponível. Atualize a lista ou escolha outra categoria.
-                </p>
-              )}
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
               {captureError && (
-                <p role="alert" className="mb-4 w-fit max-w-full break-words rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm leading-5 text-red-200">
+                <p role="alert" className="mb-4 flex w-fit max-w-full items-start gap-2.5 break-words rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3.5 py-3 text-sm leading-5 text-red-200">
+                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                   {captureError}
                 </p>
               )}
-              <div className="grid gap-3 sm:grid-cols-2">
-                {filteredSources.map((source) => (
-                  <button
-                    key={source.id}
-                    type="button"
-                    disabled={isPreparingSource}
-                    onClick={() => void handleSelectSource(source.id)}
-                    aria-pressed={selectedSourceId === source.id}
-                    className={`overflow-hidden rounded-xl border text-left transition ${
-                      selectedSourceId === source.id
-                        ? 'border-blue-400 ring-2 ring-blue-400/30'
-                        : 'border-slate-700 hover:border-slate-500'
-                    }`}
-                  >
-                    <img src={source.thumbnailDataUrl} alt="" className="aspect-video w-full bg-slate-950 object-cover" />
-                    <span className="block truncate px-3 py-2.5 text-sm text-slate-200">{source.name}</span>
-                  </button>
-                ))}
-              </div>
+              {isLoadingSources && filteredSources.length === 0 && (
+                <div role="status" className="flex min-h-64 flex-col items-center justify-center text-center">
+                  <span className="grid h-12 w-12 place-items-center rounded-xl border border-slate-700 bg-slate-800/70 text-blue-300">
+                    <RefreshCw className="h-5 w-5 animate-spin" />
+                  </span>
+                  <p className="mt-4 text-sm font-medium text-slate-200">Buscando {sourceKind === 'screen' ? 'monitores' : 'janelas'}…</p>
+                  <p className="mt-1 text-xs text-slate-500">Isso pode levar alguns segundos.</p>
+                </div>
+              )}
+              {!isLoadingSources && filteredSources.length === 0 && (
+                <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-slate-700/80 bg-slate-950/30 px-6 text-center">
+                  <span className="grid h-12 w-12 place-items-center rounded-xl border border-slate-700 bg-slate-800/70 text-slate-400">
+                    {sourceKind === 'screen' ? <Monitor className="h-5 w-5" /> : <AppWindow className="h-5 w-5" />}
+                  </span>
+                  <p className="mt-4 text-sm font-medium text-slate-200">Nenhuma {sourceKind === 'screen' ? 'tela' : 'janela'} encontrada</p>
+                  <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">
+                    Atualize a lista ou escolha outra categoria para continuar.
+                  </p>
+                </div>
+              )}
+              {filteredSources.length > 0 && (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {filteredSources.map((source) => (
+                    <button
+                      key={source.id}
+                      type="button"
+                      disabled={isPreparingSource}
+                      onClick={() => void handleSelectSource(source.id)}
+                      aria-pressed={selectedSourceId === source.id}
+                      className={`group overflow-hidden rounded-xl border bg-slate-950/50 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 disabled:cursor-wait disabled:opacity-60 ${
+                        selectedSourceId === source.id
+                          ? 'border-blue-400/80 ring-2 ring-blue-400/25'
+                          : 'border-slate-700/80 hover:border-slate-500'
+                      }`}
+                    >
+                      <span className="relative block overflow-hidden bg-slate-950">
+                        <img
+                          src={source.thumbnailDataUrl}
+                          alt=""
+                          className="aspect-video w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                        />
+                        <span className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                        {selectedSourceId === source.id && (
+                          <span className="absolute right-2.5 top-2.5 grid h-6 w-6 place-items-center rounded-full bg-blue-500 text-white shadow-lg">
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex min-w-0 items-center justify-between gap-3 px-3.5 py-3">
+                        <span className="min-w-0 truncate text-sm font-medium text-slate-200">{source.name}</span>
+                        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+                          {sourceKind === 'screen' ? 'Tela' : 'Janela'}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
               {supportsSystemAudio && (
-                <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-700 bg-slate-950/40 p-3.5">
+                <label className="mt-5 flex cursor-pointer items-center gap-3.5 rounded-xl border border-slate-700/80 bg-slate-950/40 p-3.5 transition-colors hover:border-slate-600">
                   <input
                     type="checkbox"
                     checked={includeSystemAudio}
@@ -615,20 +687,24 @@ export default function RoomPage({
                     onChange={(event) => {
                       void onPrepareSource(selectedSourceId, event.currentTarget.checked);
                     }}
-                    className="mt-0.5 accent-blue-500"
+                    className="h-4 w-4 shrink-0 accent-blue-500"
                   />
-                  <span>
+                  <Volume2 className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium text-slate-200">Incluir áudio do sistema</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-400">
+                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">
                       Captura a saída geral do Windows — inclusive áudio de chamadas e outros aplicativos.
                     </span>
+                  </span>
+                  <span className="hidden shrink-0 rounded-full border border-slate-700 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-slate-500 sm:inline">
+                    Opcional
                   </span>
                 </label>
               )}
             </div>
 
-            <footer className="flex flex-col-reverse gap-2 border-t border-slate-800 px-5 py-4 sm:flex-row sm:justify-between sm:px-6">
-              <p className="self-center text-xs text-slate-500">Qualidade inicial: até 720p · 30 FPS</p>
+            <footer className="flex flex-col-reverse gap-3 border-t border-slate-800/80 bg-slate-950/30 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+              <p className="self-center text-xs text-slate-500">Qualidade inicial de transmissão: até 720p · 30 FPS</p>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="ghost" onClick={closeSourcePicker}>
                   Cancelar
@@ -642,8 +718,9 @@ export default function RoomPage({
                     isStartingCapture
                   }
                   onClick={() => void handleStartCapture()}
-                  className="bg-blue-600 text-white hover:bg-blue-500"
+                  className="gap-2 bg-blue-600 px-4 text-white hover:bg-blue-500"
                 >
+                  {!isPreparingSource && !isStartingCapture && <ScreenIcon className="h-4 w-4" />}
                   {isPreparingSource ? 'Preparando…' : isStartingCapture ? 'Iniciando…' : 'Compartilhar'}
                 </Button>
               </div>
