@@ -40,9 +40,9 @@ interface RoomPageProps {
 }
 
 const connectionLabels: Record<PeerConnectionStatus, string> = {
-  connecting: 'Negociando WebRTC',
-  connected: 'WebRTC conectado',
-  disconnected: 'Conexão interrompida',
+  connecting: 'Conectando',
+  connected: 'Conectado',
+  disconnected: 'Interrompido',
   failed: 'Falha na conexão',
 };
 
@@ -309,15 +309,35 @@ export default function RoomPage({
           </section>
 
           <aside className="order-2 flex flex-col gap-4 lg:order-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-200">Participantes</h2>
-                <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-300">
-                  {room.participants.length} / {room.maxParticipants}
+            <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-100">Participantes</h2>
+                  <p className="mt-1 text-xs text-slate-500">Pessoas nesta sala</p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-950/60 px-2.5 py-1.5 text-xs font-medium tabular-nums text-slate-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  {room.participants.length}
+                  <span className="text-slate-600">/</span>
+                  {room.maxParticipants}
                 </span>
               </div>
 
-              <ul className="mt-4 space-y-2">
+              <div
+                className="mt-4 h-1 overflow-hidden rounded-full bg-slate-800"
+                role="progressbar"
+                aria-label="Vagas ocupadas"
+                aria-valuemin={0}
+                aria-valuemax={room.maxParticipants}
+                aria-valuenow={room.participants.length}
+              >
+                <div
+                  className="h-full rounded-full bg-blue-500/80 transition-[width]"
+                  style={{ width: `${(room.participants.length / room.maxParticipants) * 100}%` }}
+                />
+              </div>
+
+              <ul className="mt-3 space-y-1.5">
                 {room.participants.map((participant) => {
                   const isSelf = participant.id === selfParticipantId;
                   const peerStatus = connectionStates[participant.id];
@@ -325,71 +345,82 @@ export default function RoomPage({
                     ? signalingStatus === 'connected' ? 'connected' : 'reconnecting'
                     : peerStatus ?? 'waiting';
                   const connectionLabel = isSelf
-                    ? signalingStatus === 'connected' ? 'Sinalização conectada' : signalingStatus === 'restoring' ? 'Restaurando sala' : 'Reconectando sinalização'
+                    ? signalingStatus === 'connected' ? 'Conectado' : signalingStatus === 'restoring' ? 'Restaurando' : 'Reconectando'
                     : peerStatus ? connectionLabels[peerStatus] : 'Aguardando conexão WebRTC';
                   const initials = getParticipantInitials(participant.displayName);
                   const avatarHue = getParticipantAvatarHue(participant.displayName);
+                  const statusColor = isSelf
+                    ? signalingStatus === 'connected' ? 'bg-emerald-400' : 'bg-amber-300'
+                    : connectionIndicatorClasses[connectionStatus];
+                  const presenceColor = participant.presence === 'available'
+                    ? 'bg-emerald-400'
+                    : participant.presence === 'away' ? 'bg-amber-300' : 'bg-red-400';
 
                   return (
-                    <li key={participant.id} className="flex items-center gap-3 rounded-xl bg-slate-950/40 p-3">
+                    <li
+                      key={participant.id}
+                      className="group flex items-center gap-3 rounded-xl border border-transparent bg-slate-950/35 px-3 py-3 transition-colors hover:border-slate-700/70 hover:bg-slate-950/65"
+                    >
                       <div
-                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-semibold text-white"
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-semibold tracking-wide text-white shadow-sm"
                         style={{ backgroundColor: `hsl(${avatarHue} 42% 36%)` }}
+                        role="img"
                         aria-label={`Avatar de ${participant.displayName}`}
                       >
                         {initials}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-1.5 truncate text-sm font-medium text-slate-100">
-                          {participant.role === 'host' && <CrownIcon />}
-                          <span className="truncate">{participant.displayName}</span>
-                          {isSelf && <span className="shrink-0 text-xs font-normal text-blue-300">Você</span>}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {isSelf
-                            ? participant.role === 'host' ? 'Você · Host' : 'Você'
-                            : participant.role === 'host' ? `Host · ${connectionLabel}` : connectionLabel}
-                        </p>
-                        <p className={`mt-1 text-xs ${participant.microphoneEnabled ? 'text-emerald-300' : 'text-slate-500'}`}>
-                          {participant.microphoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}
-                        </p>
-                        {isSelf && (
-                          <label className="mt-2 block">
-                            <span className="sr-only">Seu estado de presença</span>
-                            <select
-                              value={participant.presence}
-                              onChange={(event) => handlePresenceChange(event.currentTarget.value)}
-                              className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-300 outline-none focus:border-blue-400"
-                            >
-                              <option value="available">Disponível</option>
-                              <option value="away">Ausente</option>
-                              <option value="busy">Ocupado</option>
-                            </select>
-                          </label>
-                        )}
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="truncate text-sm font-medium text-slate-100">{participant.displayName}</p>
+                          {participant.role === 'host' && (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300/15 bg-amber-300/[0.07] px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
+                              <CrownIcon />
+                              Host
+                            </span>
+                          )}
+                          {isSelf && (
+                            <span className="shrink-0 rounded-md bg-blue-400/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-200">
+                              Você
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
+                            <span className={`h-1.5 w-1.5 rounded-full ${statusColor}`} />
+                            {connectionLabel}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 text-[11px] ${participant.microphoneEnabled ? 'text-slate-300' : 'text-slate-500'}`}>
+                            <MicrophoneIcon enabled={participant.microphoneEnabled} />
+                            {participant.microphoneEnabled ? 'Mic ligado' : 'Mic desligado'}
+                          </span>
+                          {isSelf && (
+                            <label className="inline-flex items-center gap-1.5">
+                              <span className="sr-only">Seu estado de presença</span>
+                              <span className={`h-1.5 w-1.5 rounded-full ${presenceColor}`} aria-hidden="true" />
+                              <select
+                                value={participant.presence}
+                                onChange={(event) => handlePresenceChange(event.currentTarget.value)}
+                                className="cursor-pointer appearance-none border-0 bg-transparent p-0 text-[11px] text-slate-400 outline-none transition-colors hover:text-slate-200 focus-visible:text-slate-200"
+                              >
+                                <option value="available">Disponível</option>
+                                <option value="away">Ausente</option>
+                                <option value="busy">Ocupado</option>
+                              </select>
+                            </label>
+                          )}
+                        </div>
                       </div>
-                      <span
-                        className={`h-2 w-2 shrink-0 rounded-full ${
-                          isSelf
-                            ? participant.presence === 'available'
-                              ? 'bg-emerald-400'
-                              : participant.presence === 'away' ? 'bg-amber-300' : 'bg-red-400'
-                            : connectionIndicatorClasses[connectionStatus]
-                        }`}
-                        role="img"
-                        aria-label={isSelf ? `Presença ${participant.presence}` : connectionLabel}
-                      />
                       {isHost && !isSelf && participant.role !== 'host' && (
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
                           aria-label={`Remover ${participant.displayName}`}
-                          title={`Remover ${participant.displayName}`}
+                          title="Remover participante"
                           onClick={() => handleKick(participant.id, participant.displayName)}
-                          className="h-8 w-8 shrink-0 text-slate-500 hover:bg-red-400/10 hover:text-red-200"
+                          className="h-8 w-8 shrink-0 rounded-lg border border-transparent text-slate-500 opacity-70 hover:border-red-400/20 hover:bg-red-400/10 hover:text-red-200 focus-visible:opacity-100 group-hover:opacity-100"
                         >
-                          <span aria-hidden="true">×</span>
+                          <RemoveParticipantIcon />
                         </Button>
                       )}
                     </li>
@@ -613,6 +644,29 @@ function CrownIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 shrink-0 text-amber-300">
       <path d="m3 6 3.1 2.3L10 3l3.9 5.3L17 6l-1.3 9H4.3L3 6Zm2 10h10v1H5v-1Z" />
+    </svg>
+  );
+}
+
+function MicrophoneIcon({ enabled }: { enabled: boolean }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 shrink-0">
+      <path
+        d="M8 10.5a2.25 2.25 0 0 0 2.25-2.25v-4a2.25 2.25 0 0 0-4.5 0v4A2.25 2.25 0 0 0 8 10.5Z M4.75 7.75v.5a3.25 3.25 0 0 0 6.5 0v-.5 M8 11.5v2 M6.25 13.5h3.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.25"
+      />
+      {!enabled && <path d="m3 3 10 10" stroke="currentColor" strokeLinecap="round" strokeWidth="1.25" />}
+    </svg>
+  );
+}
+
+function RemoveParticipantIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+      <path d="M4 6h12M8 6V4h4v2m2 0-.7 10H6.7L6 6m2.5 3v4m3-4v4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" />
     </svg>
   );
 }
