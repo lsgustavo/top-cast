@@ -60,15 +60,15 @@ alheios ao escopo nesses commits.
 
 ### Etapa 2 — Credenciais TURN temporárias no signaling
 
-- [ ] Adicionar geração de credenciais TURN REST temporárias compatíveis com
+- [x] Adicionar geração de credenciais TURN REST temporárias compatíveis com
   Coturn, usando segredo somente no servidor.
-- [ ] Validar e documentar as variáveis de ambiente necessárias; sem segredo
+- [x] Validar e documentar as variáveis de ambiente necessárias; sem segredo
   configurado, manter apenas STUN e deixar explícita a limitação.
-- [ ] Permitir solicitar configuração ICE apenas a um socket que já pertença a
+- [x] Permitir solicitar configuração ICE apenas a um socket que já pertença a
   uma sala; limitar pedidos repetidos.
-- [ ] Adicionar testes para URLs/configuração, assinatura e expiração das
+- [x] Adicionar testes para URLs/configuração, assinatura e expiração das
   credenciais.
-- [ ] Commit próprio após testes.
+- [x] Commit próprio após testes (`pendente` até gravar este commit).
 
 ### Etapa 3 — Usar TURN/STUN no WebRTC
 

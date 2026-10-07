@@ -10,6 +10,17 @@ export interface ServerPingResponse {
   serverTime: number;
 }
 
+export interface IceServerConfiguration {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+  credentialType?: 'password';
+}
+
+export type IceServersResult =
+  | { ok: true; iceServers: IceServerConfiguration[] }
+  | { ok: false; error: 'NOT_IN_ROOM' | 'RATE_LIMITED' | 'SERVER_ERROR' };
+
 export interface RoomParticipant {
   id: string;
   displayName: string;
@@ -101,6 +112,7 @@ export interface ServerToClientEvents {
 
 export interface ClientToServerEvents {
   'server:ping': (acknowledge: (response: ServerPingResponse) => void) => void;
+  'webrtc:ice-servers': (acknowledge: (result: IceServersResult) => void) => void;
   'room:create': (
     payload: CreateRoomPayload,
     acknowledge: (result: RoomOperationResult) => void,

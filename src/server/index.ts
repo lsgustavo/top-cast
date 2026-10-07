@@ -2,9 +2,11 @@ import Fastify from 'fastify';
 import { Server } from 'socket.io';
 import { RoomService } from './services/room-service.js';
 import { isValidDescriptionPayload, isValidIceCandidatePayload } from './services/signaling-validation.js';
+import { createIceServerConfiguration, loadTurnConfiguration } from './services/ice-credentials.js';
 import {
   SIGNALING_PROTOCOL_VERSION,
   type ClientToServerEvents,
+  type IceServersResult,
   type InterServerEvents,
   type MicrophoneStateResult,
   type ServerToClientEvents,
@@ -46,9 +48,12 @@ const io = new Server<
   },
 });
 const roomService = new RoomService();
+const turnConfiguration = loadTurnConfiguration(process.env);
 const JOIN_ATTEMPT_WINDOW_MS = 60_000;
 const MAX_JOIN_ATTEMPTS_PER_WINDOW = 10;
 const joinAttemptsByAddress = new Map<string, { windowStartedAt: number; attempts: number }>();
+const ICE_REQUEST_WINDOW_MS = 60_000;
+const MAX_ICE_REQUESTS_PER_WINDOW = 10;
 
 app.get('/health', async () => ({
   status: 'ok',
@@ -61,8 +66,45 @@ io.on('connection', (socket) => {
 
   socket.emit('server:ready', { protocolVersion: SIGNALING_PROTOCOL_VERSION });
 
+  let iceRequestWindowStartedAt = 0;
+  let iceRequestsInWindow = 0;
+
   socket.on('server:ping', (acknowledge) => {
     acknowledge({ serverTime: Date.now() });
+  });
+
+  socket.on('webrtc:ice-servers', (acknowledge) => {
+    if (typeof acknowledge !== 'function') {
+      app.log.warn({ socketId: socket.id }, 'Rejected webrtc:ice-servers without acknowledgment callback');
+      return;
+    }
+
+    if (!socket.data.roomId || socket.data.participantId !== socket.id) {
+      acknowledge({ ok: false, error: 'NOT_IN_ROOM' });
+      return;
+    }
+
+    const now = Date.now();
+    if (now - iceRequestWindowStartedAt >= ICE_REQUEST_WINDOW_MS) {
+      iceRequestWindowStartedAt = now;
+      iceRequestsInWindow = 0;
+    }
+    if (iceRequestsInWindow >= MAX_ICE_REQUESTS_PER_WINDOW) {
+      acknowledge({ ok: false, error: 'RATE_LIMITED' });
+      return;
+    }
+    iceRequestsInWindow += 1;
+
+    try {
+      const result: IceServersResult = {
+        ok: true,
+        iceServers: createIceServerConfiguration(socket.id, turnConfiguration, now),
+      };
+      acknowledge(result);
+    } catch (error) {
+      app.log.error({ error, socketId: socket.id }, 'Failed to create ICE server configuration');
+      acknowledge({ ok: false, error: 'SERVER_ERROR' });
+    }
   });
 
   socket.on('room:create', async (payload, acknowledge) => {

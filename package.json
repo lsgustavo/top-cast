@@ -13,7 +13,7 @@
     "build:installer": "npm run build:windows && electron-builder --win nsis --x64",
     "verify:production": "node scripts/verify-production-build.mjs",
     "preview": "vite preview --host",
-    "test": "tsx --test src/server/services/room-service.test.ts src/server/services/signaling-validation.test.ts"
+    "test": "tsx --test src/server/services/room-service.test.ts src/server/services/signaling-validation.test.ts src/server/services/ice-credentials.test.ts"
   },
   "keywords": [
     "electron",

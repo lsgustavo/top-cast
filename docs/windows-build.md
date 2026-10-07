@@ -31,6 +31,28 @@ screen; the value is saved locally. `VITE_SIGNALING_URL` still sets the default
 for a build. The installer includes the compiled signaling server but does not
 start or deploy it. The Windows installer is not code-signed yet.
 
+For Internet connectivity, deploy a Coturn-compatible TURN service and provide
+the signaling server with `TURN_URLS` (comma-separated `turn:`/`turns:` URLs)
+and `TURN_SHARED_SECRET` (at least 32 characters). The TURN service and
+signaling server must use the same REST shared secret. Keep that secret only in
+the server environment; TopCast issues participant-scoped credentials that
+expire after 24 hours. Without these settings clients receive STUN only, which
+does not guarantee connectivity through restrictive NATs/firewalls.
+
+Example server environment (use a secret manager in production):
+
+```powershell
+$env:TURN_URLS = "turn:turn.example.com:3478,turns:turn.example.com:5349"
+$env:TURN_SHARED_SECRET = "<server-side secret>"
+$env:SIGNALING_HOST = "0.0.0.0"
+npm run dev:server
+```
+
+Do not put `TURN_SHARED_SECRET` in a `VITE_*` variable, renderer configuration,
+installer, or source control. Configure Coturn's `use-auth-secret` and
+`static-auth-secret` with the same secret, and open the relay port range as well
+as the TURN listener ports. Use HTTPS/TLS in production.
+
 ## Local network smoke test
 
 For a development-only LAN test, run the signaling server on the host computer
