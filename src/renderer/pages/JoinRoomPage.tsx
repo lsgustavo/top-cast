@@ -7,6 +7,7 @@ import type { SignalingClient } from '../lib/signaling-client';
 
 interface JoinRoomPageProps {
   socket: SignalingClient;
+  displayName: string;
   onBack: () => void;
   onRoomJoined: (room: RoomSnapshot) => void;
 }
@@ -14,6 +15,7 @@ interface JoinRoomPageProps {
 type SubmissionState = 'idle' | 'invalid' | 'server-error' | 'loading';
 
 const roomErrorMessages: Record<string, string> = {
+  ROOM_EXISTS: 'Já existe uma sala ativa. Entre com o código de convite dela.',
   INVALID_CODE: 'Código inválido ou sala inexistente.',
   ROOM_EXPIRED: 'Esta sala expirou.',
   ROOM_FULL: 'Esta sala já atingiu o limite de participantes.',
@@ -24,9 +26,9 @@ const roomErrorMessages: Record<string, string> = {
 };
 
 function formatInviteCode(value: string): string {
-  const normalized = value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
-  return normalized.length > 4
-    ? `${normalized.slice(0, 4)}-${normalized.slice(4)}`
+  const normalized = value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+  return normalized.length > 3
+    ? `${normalized.slice(0, 3)}-${normalized.slice(3)}`
     : normalized;
 }
 
@@ -39,11 +41,11 @@ function ScreenIcon() {
   );
 }
 
-export default function JoinRoomPage({ socket, onBack, onRoomJoined }: JoinRoomPageProps) {
+export default function JoinRoomPage({ socket, displayName, onBack, onRoomJoined }: JoinRoomPageProps) {
   const [inviteCode, setInviteCode] = useState('');
   const [submissionState, setSubmissionState] = useState<SubmissionState>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const isCodeComplete = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(inviteCode);
+  const isCodeComplete = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/.test(inviteCode);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,7 +57,7 @@ export default function JoinRoomPage({ socket, onBack, onRoomJoined }: JoinRoomP
     setSubmissionState('loading');
     setErrorMessage('');
     try {
-      const result = await joinRoom(socket, inviteCode, 'Participante');
+      const result = await joinRoom(socket, inviteCode, displayName);
       if (!result.ok) {
         setSubmissionState('server-error');
         setErrorMessage(roomErrorMessages[result.error] ?? 'Não foi possível entrar na sala.');
@@ -124,8 +126,8 @@ export default function JoinRoomPage({ socket, onBack, onRoomJoined }: JoinRoomP
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}
-              maxLength={9}
-              placeholder="AB7K-92PX"
+              maxLength={7}
+              placeholder="AB7-92P"
               value={inviteCode}
               onChange={(event) => handleCodeChange(event.target.value)}
               aria-describedby="invite-code-hint invite-code-status"
@@ -133,13 +135,13 @@ export default function JoinRoomPage({ socket, onBack, onRoomJoined }: JoinRoomP
               className="h-14 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 text-center font-mono text-xl tracking-[0.18em] text-slate-100 outline-none transition placeholder:text-slate-700 focus:border-blue-400/70 focus:ring-2 focus:ring-blue-400/15"
             />
             <p id="invite-code-hint" className="mt-2 text-xs text-slate-500">
-              O código tem 8 letras ou números. O hífen é inserido automaticamente.
+              O código tem 6 letras ou números. O hífen é inserido automaticamente.
             </p>
 
             <div id="invite-code-status" aria-live="polite" className="mt-4 min-h-12">
               {submissionState === 'invalid' && (
                 <p role="alert" className="rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm text-red-200">
-                  Informe um código completo no formato XXXX-XXXX.
+                  Informe um código completo no formato XXX-XXX.
                 </p>
               )}
               {submissionState === 'server-error' && (

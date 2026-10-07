@@ -4,7 +4,7 @@ import HomePage from './pages/HomePage';
 import JoinRoomPage from './pages/JoinRoomPage';
 import RoomPage from './pages/RoomPage';
 import { createSignalingClient } from './lib/signaling-client';
-import type { RoomSnapshot, SignalingStatus } from '../shared/types/signaling';
+import type { RoomAvailability, RoomSnapshot, SignalingStatus } from '../shared/types/signaling';
 import { createRoom as requestRoomCreation, joinRoom as requestRoomJoin } from './lib/room-client';
 import { useRoomWebRtc } from './features/streaming/use-room-webrtc';
 import { useScreenCapture } from './features/streaming/use-screen-capture';
@@ -12,10 +12,15 @@ import { useMicrophone } from './features/streaming/use-microphone';
 import { getReconnectIdentity, type ReconnectIdentity } from './lib/reconnect-identity';
 
 const SIGNALING_URL_STORAGE_KEY = 'topcast:signaling-url';
+const DISPLAY_NAME_STORAGE_KEY = 'topcast:display-name';
 const DEFAULT_SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL ?? 'http://127.0.0.1:3001';
 
 function getSavedSignalingUrl(): string {
   return window.localStorage.getItem(SIGNALING_URL_STORAGE_KEY) ?? DEFAULT_SIGNALING_URL;
+}
+
+function getSavedDisplayName(): string {
+  return window.localStorage.getItem(DISPLAY_NAME_STORAGE_KEY) ?? '';
 }
 
 export default function App() {
@@ -23,6 +28,8 @@ export default function App() {
   const [signalingServerUrl, setSignalingServerUrl] = useState(getSavedSignalingUrl);
   const [socket, setSocket] = useState(() => createSignalingClient(signalingServerUrl));
   const [room, setRoom] = useState<RoomSnapshot | null>(null);
+  const [displayName, setDisplayName] = useState(getSavedDisplayName);
+  const [roomAvailability, setRoomAvailability] = useState<RoomAvailability['active'] | null>(null);
   const [homeNotice, setHomeNotice] = useState('');
   const [signalingStatus, setSignalingStatus] = useState<SignalingStatus>('connected');
   const screenCapture = useScreenCapture();
@@ -35,6 +42,7 @@ export default function App() {
   roomRef.current = room;
 
   function applySignalingServer(url: string) {
+    setRoomAvailability(null);
     setSignalingServerUrl(url);
     setSocket(createSignalingClient(url));
     try {
@@ -46,6 +54,17 @@ export default function App() {
           ? `Servidor atualizado, mas não foi possível salvar a configuração: ${error.message}`
           : 'Servidor atualizado, mas não foi possível salvar a configuração.',
       );
+    }
+  }
+
+  function updateDisplayName(name: string) {
+    setDisplayName(name.slice(0, 32));
+    try {
+      window.localStorage.setItem(DISPLAY_NAME_STORAGE_KEY, name.slice(0, 32));
+    } catch (error) {
+      setHomeNotice(error instanceof Error
+        ? `Nome atualizado, mas não foi possível salvá-lo: ${error.message}`
+        : 'Nome atualizado, mas não foi possível salvá-lo.');
     }
   }
   const { connectionStates, remoteStreams } = useRoomWebRtc(
@@ -66,6 +85,7 @@ export default function App() {
     const handleRoomUpdated = (updatedRoom: RoomSnapshot) => {
       setRoom((currentRoom) => currentRoom?.id === updatedRoom.id ? updatedRoom : currentRoom);
     };
+    const handleRoomAvailability = ({ active }: RoomAvailability) => setRoomAvailability(active);
     const handleRoomClosed = ({ reason }: { reason: 'host-left' | 'expired' }) => {
       reconnectIdentityRef.current = null;
       screenCapture.stopCapture();
@@ -74,12 +94,24 @@ export default function App() {
       setPage('home');
       setHomeNotice(reason === 'expired' ? 'A sala expirou.' : 'O host encerrou a sala.');
     };
+    const handleKicked = () => {
+      reconnectIdentityRef.current = null;
+      screenCapture.stopCapture();
+      microphone.disable();
+      setRoom(null);
+      setPage('home');
+      setHomeNotice('O host removeu você da sala.');
+    };
 
+    socket.on('room:availability', handleRoomAvailability);
     socket.on('room:updated', handleRoomUpdated);
     socket.on('room:closed', handleRoomClosed);
+    socket.on('room:kicked', handleKicked);
     return () => {
+      socket.off('room:availability', handleRoomAvailability);
       socket.off('room:updated', handleRoomUpdated);
       socket.off('room:closed', handleRoomClosed);
+      socket.off('room:kicked', handleKicked);
       socket.disconnect();
     };
   }, [socket, screenCapture.stopCapture, microphone.disable]);
@@ -113,6 +145,7 @@ export default function App() {
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('connect_error', handleConnectError);
+    socket.connect();
     return () => {
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
@@ -133,27 +166,26 @@ export default function App() {
     let cancelled = false;
     const restoreRoom = async () => {
       try {
-        if (identity.role === 'host') {
-          const result = await requestRoomCreation(socket, identity.displayName);
-          if (!result.ok) {
-            throw new Error(`Não foi possível recriar sua sala (${result.error}).`);
-          }
-          if (cancelled) return;
-          setRoom(result.room);
-          reconnectIdentityRef.current = getReconnectIdentity(result.room, socket.id);
-          setPage('room');
-          setHomeNotice('Conexão restaurada. A sala anterior foi encerrada; compartilhe o novo código de convite.');
-        } else {
-          const result = await requestRoomJoin(socket, identity.inviteCode, identity.displayName);
-          if (!result.ok) {
-            throw new Error(`Não foi possível reentrar na sala (${result.error}).`);
-          }
-          if (cancelled) return;
-          setRoom(result.room);
-          reconnectIdentityRef.current = getReconnectIdentity(result.room, socket.id);
-          setPage('room');
-          setHomeNotice('');
+        let result = await requestRoomJoin(socket, identity.inviteCode, identity.displayName);
+        if (
+          !result.ok &&
+          identity.role === 'host' &&
+          (result.error === 'INVALID_CODE' || result.error === 'ROOM_EXPIRED')
+        ) {
+          result = await requestRoomCreation(socket, identity.displayName);
         }
+        if (!result.ok) {
+          throw new Error(`Não foi possível restaurar sua sala (${result.error}).`);
+        }
+        if (cancelled) return;
+        setRoom(result.room);
+        reconnectIdentityRef.current = getReconnectIdentity(result.room, socket.id);
+        setPage('room');
+        setHomeNotice(identity.role === 'host' && result.room.participants.find((participant) => participant.id === socket.id)?.role === 'guest'
+          ? 'Você voltou à sala como participante; o host foi transferido.'
+          : identity.role === 'host'
+            ? 'Conexão restaurada; uma nova sala foi criada. Compartilhe o novo convite.'
+            : '');
       } catch (error) {
         if (cancelled) return;
         reconnectIdentityRef.current = null;
@@ -188,6 +220,7 @@ export default function App() {
     return (
       <CreateRoomPage
         socket={socket}
+        displayName={displayName}
         onBack={() => setPage('home')}
         onRoomCreated={(createdRoom) => {
           reconnectIdentityRef.current = getReconnectIdentity(createdRoom, socket.id);
@@ -203,6 +236,7 @@ export default function App() {
     return (
       <JoinRoomPage
         socket={socket}
+        displayName={displayName}
         onBack={() => setPage('home')}
         onRoomJoined={(joinedRoom) => {
           reconnectIdentityRef.current = getReconnectIdentity(joinedRoom, socket.id);
@@ -266,6 +300,9 @@ export default function App() {
     <HomePage
       notice={homeNotice}
       signalingServerUrl={signalingServerUrl}
+      displayName={displayName}
+      roomIsActive={roomAvailability}
+      onDisplayNameChange={updateDisplayName}
       onApplySignalingServer={applySignalingServer}
       onCreateRoom={() => {
         setHomeNotice('');

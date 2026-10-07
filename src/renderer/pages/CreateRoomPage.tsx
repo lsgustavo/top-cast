@@ -6,6 +6,7 @@ import type { SignalingClient } from '../lib/signaling-client';
 
 interface CreateRoomPageProps {
   socket: SignalingClient;
+  displayName: string;
   onBack: () => void;
   onRoomCreated: (room: RoomSnapshot) => void;
 }
@@ -16,7 +17,7 @@ const errorMessages: Record<string, string> = {
   SERVER_ERROR: 'Não foi possível criar a sala. Verifique se o servidor está ativo e tente novamente.',
 };
 
-export default function CreateRoomPage({ socket, onBack, onRoomCreated }: CreateRoomPageProps) {
+export default function CreateRoomPage({ socket, displayName, onBack, onRoomCreated }: CreateRoomPageProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,9 +25,11 @@ export default function CreateRoomPage({ socket, onBack, onRoomCreated }: Create
     setIsCreating(true);
     setError(null);
     try {
-      const result = await createRoom(socket, 'Você');
+      const result = await createRoom(socket, displayName);
       if (!result.ok) {
-        setError(errorMessages[result.error] ?? 'Não foi possível criar a sala.');
+        setError(result.error === 'ROOM_EXISTS'
+          ? 'Já existe uma sala ativa no momento. Entre usando o código de convite.'
+          : errorMessages[result.error] ?? 'Não foi possível criar a sala.');
         return;
       }
       onRoomCreated(result.room);

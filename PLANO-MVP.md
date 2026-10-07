@@ -56,7 +56,7 @@ alheios ao escopo nesses commits.
 
 - [x] Atualizar serviço para sala global única, convite de seis caracteres,
   estado global em tempo real, expulsão e transferência de host em desconexão.
-- [ ] Solicitar nome de exibição na tela inicial e refletir disponibilidade
+- [x] Solicitar nome de exibição na tela inicial e refletir disponibilidade
   global no botão de criar sala.
 - [ ] Adicionar timer de expiração, feedback de cópia, badges/avatar local,
   presença e sons de entrada/saída.

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Button } from '../components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { APP_NAME } from '../../shared/constants/app';
 
 const appInfo = window.topCast?.getAppInfo() ?? {
@@ -38,6 +39,9 @@ function ActionIcon({ action }: { action: 'create' | 'join' }) {
 interface HomePageProps {
   notice: string;
   signalingServerUrl: string;
+  displayName: string;
+  roomIsActive: boolean | null;
+  onDisplayNameChange: (name: string) => void;
   onApplySignalingServer: (url: string) => void;
   onCreateRoom: () => void;
   onJoinRoom: () => void;
@@ -46,6 +50,9 @@ interface HomePageProps {
 export default function HomePage({
   notice,
   signalingServerUrl,
+  displayName,
+  roomIsActive,
+  onDisplayNameChange,
   onApplySignalingServer,
   onCreateRoom,
   onJoinRoom,
@@ -100,26 +107,59 @@ export default function HomePage({
           </p>
         </section>
 
+        <div className="mt-8">
+          <label htmlFor="display-name" className="mb-2 block text-left text-sm font-medium text-slate-200">
+            Nome de exibição
+          </label>
+          <input
+            id="display-name"
+            type="text"
+            autoComplete="nickname"
+            maxLength={32}
+            value={displayName}
+            onChange={(event) => onDisplayNameChange(event.currentTarget.value)}
+            placeholder="Como as pessoas devem chamar você?"
+            className="h-11 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/15"
+          />
+          <p className="mt-2 text-xs text-slate-500">Sem conta ou cadastro. Seu nome fica salvo neste dispositivo.</p>
+        </div>
+
         <section aria-label="Ações da sala" className="mt-9 grid gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCreateRoom}
-            className="group h-auto w-full justify-between rounded-2xl border-slate-800 bg-slate-900/70 px-5 py-4 text-left text-slate-100 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-400/50 hover:bg-slate-900 focus-visible:ring-blue-400"
-          >
-            <span className="flex items-center gap-4">
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-500/10 text-blue-300 transition-colors group-hover:bg-blue-500/15">
-                <ActionIcon action="create" />
-              </span>
-              <span>
-                <span className="block text-sm font-semibold">Criar sala</span>
-                <span className="mt-1 block text-xs font-normal text-slate-400">Inicie uma nova transmissão</span>
-              </span>
-            </span>
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-5 w-5 text-slate-500 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-300">
-              <path d="m7.5 4.5 5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="block" tabIndex={roomIsActive ? 0 : undefined}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={roomIsActive !== false || displayName.trim().length === 0}
+                    onClick={onCreateRoom}
+                    className="group h-auto w-full justify-between rounded-2xl border-slate-800 bg-slate-900/70 px-5 py-4 text-left text-slate-100 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-400/50 hover:bg-slate-900 focus-visible:ring-blue-400"
+                  >
+                    <span className="flex items-center gap-4">
+                      <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-500/10 text-blue-300 transition-colors group-hover:bg-blue-500/15">
+                        <ActionIcon action="create" />
+                      </span>
+                      <span>
+                        <span className="block text-sm font-semibold">Criar sala</span>
+                        <span className="mt-1 block text-xs font-normal text-slate-400">Inicie uma nova transmissão</span>
+                      </span>
+                    </span>
+                    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-5 w-5 text-slate-500 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-300">
+                      <path d="m7.5 4.5 5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {roomIsActive
+                  ? 'Já existe uma sala ativa no momento'
+                  : roomIsActive === null
+                    ? 'Conectando ao servidor de salas'
+                    : 'Informe um nome de exibição para criar uma sala'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           <Button
             type="button"
