@@ -90,7 +90,7 @@ export default function HomePage({
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.13),transparent_48%)]" />
 
       <div className="relative w-full max-w-[520px]">
-        <header className="mb-12 flex items-center justify-center gap-3">
+        <header className="mb-12 flex items-center justify-center gap-3 [-webkit-app-region:drag]">
           <div className="grid h-11 w-11 place-items-center rounded-2xl border border-blue-400/20 bg-blue-500/10 text-blue-300">
             <ScreenIcon />
           </div>
@@ -164,6 +164,7 @@ export default function HomePage({
           <Button
             type="button"
             variant="outline"
+            disabled={displayName.trim().length === 0}
             onClick={onJoinRoom}
             className="group h-auto w-full justify-between rounded-2xl border-slate-800 bg-slate-900/70 px-5 py-4 text-left text-slate-100 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-slate-600 hover:bg-slate-900 focus-visible:ring-blue-400"
           >

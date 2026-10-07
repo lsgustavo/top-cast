@@ -10,6 +10,8 @@ import { useRoomWebRtc } from './features/streaming/use-room-webrtc';
 import { useScreenCapture } from './features/streaming/use-screen-capture';
 import { useMicrophone } from './features/streaming/use-microphone';
 import { getReconnectIdentity, type ReconnectIdentity } from './lib/reconnect-identity';
+import { getParticipantChanges } from './lib/participant-events';
+import { playPresenceSound } from './lib/presence-sound';
 
 const SIGNALING_URL_STORAGE_KEY = 'topcast:signaling-url';
 const DISPLAY_NAME_STORAGE_KEY = 'topcast:display-name';
@@ -83,10 +85,25 @@ export default function App() {
 
   useEffect(() => {
     const handleRoomUpdated = (updatedRoom: RoomSnapshot) => {
+      const changes = getParticipantChanges(roomRef.current, updatedRoom);
+      if (changes.joined.length > 0) {
+        playPresenceSound('joined');
+        for (const participant of changes.joined) {
+          if (participant.id === socket.id || !window.topCast?.notifyParticipantJoined) {
+            continue;
+          }
+          void window.topCast.notifyParticipantJoined(participant.displayName).catch((error: unknown) => {
+            console.warn('Could not show participant system notification', error);
+          });
+        }
+      } else if (changes.left.length > 0) {
+        playPresenceSound('left');
+      }
       setRoom((currentRoom) => currentRoom?.id === updatedRoom.id ? updatedRoom : currentRoom);
     };
     const handleRoomAvailability = ({ active }: RoomAvailability) => setRoomAvailability(active);
     const handleRoomClosed = ({ reason }: { reason: 'host-left' | 'expired' }) => {
+      playPresenceSound('left');
       reconnectIdentityRef.current = null;
       screenCapture.stopCapture();
       microphone.disable();
@@ -114,6 +131,23 @@ export default function App() {
       socket.off('room:kicked', handleKicked);
       socket.disconnect();
     };
+  }, [socket, screenCapture.stopCapture, microphone.disable]);
+
+  useEffect(() => {
+    const removeShortcutListener = window.topCast?.onLeaveRoomShortcut(() => {
+      const activeRoom = roomRef.current;
+      if (!activeRoom) {
+        return;
+      }
+      reconnectIdentityRef.current = null;
+      screenCapture.stopCapture();
+      microphone.disable();
+      socket.emit('room:leave', () => undefined);
+      setRoom(null);
+      setPage('home');
+      setHomeNotice('Você saiu da sala pelo atalho Ctrl+Shift+L.');
+    });
+    return () => removeShortcutListener?.();
   }, [socket, screenCapture.stopCapture, microphone.disable]);
 
   useEffect(() => {

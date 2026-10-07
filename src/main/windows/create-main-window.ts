@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APP_NAME } from '../../shared/constants/app.js';
+import { configureNativeAppFeatures } from '../services/native-app-features.js';
 import { configureScreenCapture } from '../services/screen-capture.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +22,7 @@ export function createMainWindow(): BrowserWindow {
       nodeIntegration: false,
     },
   });
+  configureNativeAppFeatures(mainWindow);
   configureScreenCapture(mainWindow);
 
   if (app.isPackaged) {

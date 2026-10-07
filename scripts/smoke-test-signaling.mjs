@@ -44,8 +44,27 @@ function emitWithAck(socket, event, ...args) {
   });
 }
 
+function waitForEvent(socket, eventName, predicate = () => true) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      socket.off(eventName, listener);
+      reject(new Error(`Timed out waiting for ${eventName}`));
+    }, ACK_TIMEOUT_MS);
+    const listener = (payload) => {
+      if (!predicate(payload)) {
+        return;
+      }
+      clearTimeout(timeout);
+      socket.off(eventName, listener);
+      resolve(payload);
+    };
+    socket.on(eventName, listener);
+  });
+}
+
 try {
-  const [host, guest] = await Promise.all([
+  const [host, guest, removedGuest] = await Promise.all([
+    connectClient(signalingUrl),
     connectClient(signalingUrl),
     connectClient(signalingUrl),
   ]);
@@ -55,15 +74,30 @@ try {
     error: 'NOT_IN_ROOM',
   });
 
+  const roomBecameActive = waitForEvent(
+    removedGuest,
+    'room:availability',
+    (availability) => availability.active,
+  );
   const created = await emitWithAck(host, 'room:create', { displayName: 'Smoke host' });
   assert.equal(created.ok, true, `Room creation failed: ${created.error ?? 'unknown error'}`);
+  assert.deepEqual(await roomBecameActive, { active: true });
+  assert.deepEqual(await emitWithAck(removedGuest, 'room:create', { displayName: 'Second host' }), {
+    ok: false,
+    error: 'ROOM_EXISTS',
+  });
 
   const joined = await emitWithAck(guest, 'room:join', {
     inviteCode: created.room.inviteCode,
     displayName: 'Smoke guest',
   });
   assert.equal(joined.ok, true, `Room join failed: ${joined.error ?? 'unknown error'}`);
-  assert.equal(joined.room.participants.length, 2);
+  const removedGuestJoined = await emitWithAck(removedGuest, 'room:join', {
+    inviteCode: created.room.inviteCode,
+    displayName: 'Removed guest',
+  });
+  assert.equal(removedGuestJoined.ok, true, `Second guest join failed: ${removedGuestJoined.error ?? 'unknown error'}`);
+  assert.equal(removedGuestJoined.room.participants.length, 3);
 
   for (const socket of [host, guest]) {
     const iceResult = await emitWithAck(socket, 'webrtc:ice-servers');
@@ -93,12 +127,24 @@ try {
   });
   assert.deepEqual(forbiddenOffer, { ok: false, error: 'NOT_ALLOWED' });
 
-  const roomClosed = new Promise((resolve) => {
-    guest.once('room:closed', resolve);
-  });
-  const leaveResult = await emitWithAck(host, 'room:leave');
+  const kickedNotice = waitForEvent(removedGuest, 'room:kicked');
+  const kicked = await emitWithAck(host, 'room:kick', { participantId: removedGuest.id });
+  assert.deepEqual(kicked, { ok: true });
+  assert.deepEqual(await kickedNotice, { reason: 'removed-by-host' });
+
+  const transferredRoom = waitForEvent(
+    guest,
+    'room:updated',
+    (updatedRoom) => updatedRoom.participants.find((participant) => participant.id === guest.id)?.role === 'host',
+  );
+  host.disconnect();
+  const transferred = await transferredRoom;
+  assert.equal(transferred.participants.length, 1);
+
+  const roomClosed = waitForEvent(removedGuest, 'room:availability', (availability) => !availability.active);
+  const leaveResult = await emitWithAck(guest, 'room:leave');
   assert.deepEqual(leaveResult, { ok: true });
-  assert.deepEqual(await roomClosed, { reason: 'host-left' });
+  assert.deepEqual(await roomClosed, { active: false });
 
   console.log(`Signaling smoke test passed against ${signalingUrl}`);
 } finally {

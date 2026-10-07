@@ -242,7 +242,7 @@ export default function RoomPage({
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.1),transparent_48%)]" />
 
       <div className="relative mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[1600px] flex-1 flex-col lg:min-h-0">
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-800/80 pb-4 [-webkit-app-region:drag]">
           <div>
             <h1 className="text-base font-semibold">Sala de transmissão</h1>
             <p className="mt-1 text-xs text-slate-500">{isHost ? 'Você é o host' : 'Você entrou como participante'}</p>

@@ -15,6 +15,13 @@ const api: TopCastApi = {
     selectSource: (sourceId: string | null, includeSystemAudio: boolean) =>
       ipcRenderer.invoke('screen-capture:select-source', sourceId, includeSystemAudio),
   },
+  notifyParticipantJoined: (displayName: string) =>
+    ipcRenderer.invoke('app:notify-participant-joined', displayName),
+  onLeaveRoomShortcut: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on('app:leave-room-shortcut', listener);
+    return () => ipcRenderer.removeListener('app:leave-room-shortcut', listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('topCast', api);

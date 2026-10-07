@@ -58,11 +58,15 @@ alheios ao escopo nesses commits.
   estado global em tempo real, expulsão e transferência de host em desconexão.
 - [x] Solicitar nome de exibição na tela inicial e refletir disponibilidade
   global no botão de criar sala.
-- [x] Adicionar timer de expiração, feedback de cópia, badges/avatar local e
-  presença.
-- [ ] Sons sutis de entrada/saída.
-- [ ] Adicionar atalho global e notificação nativa por novo participante.
-- [ ] Cobrir todas as funções com testes e commits isolados.
+- [x] Adicionar timer de expiração, toast de cópia, badges de host/usuário,
+  avatar gerado localmente e presença com cores/status.
+- [x] Adicionar sons sutis de entrada/saída.
+- [x] Adicionar atalho global Ctrl+Shift+L e notificação nativa quando o app
+  está minimizado.
+- [x] Cobrir as regras de sala, expulsão, sucessão, contagem regressiva,
+  mudanças de participantes e fluxo real de signaling com testes.
+- [x] Registrar os controles e limites em [docs/room-controls.md](./docs/room-controls.md).
+- [x] Commits isolados para cada grupo de funcionalidades.
 
 ### Etapa 1 — Plano e critérios de aceite
 

@@ -1,4 +1,5 @@
 import { app, BrowserWindow } from 'electron';
+import { unregisterNativeAppFeatures } from './services/native-app-features.js';
 import { createMainWindow } from './windows/create-main-window.js';
 
 app.whenReady().then(() => {
@@ -16,3 +17,5 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+app.on('will-quit', unregisterNativeAppFeatures);

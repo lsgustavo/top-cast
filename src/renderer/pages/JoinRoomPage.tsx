@@ -159,7 +159,7 @@ export default function JoinRoomPage({ socket, displayName, onBack, onRoomJoined
             <Button
               type="submit"
               size="lg"
-              disabled={!isCodeComplete || submissionState === 'loading'}
+              disabled={!isCodeComplete || displayName.trim().length === 0 || submissionState === 'loading'}
               className="mt-2 w-full bg-blue-600 text-white hover:bg-blue-500"
             >
               {submissionState === 'loading' ? 'Verificando…' : 'Entrar na sala'}

@@ -25,5 +25,7 @@ export interface ScreenCaptureApi {
 
 export interface TopCastApi {
   getAppInfo: () => AppInfo;
+  notifyParticipantJoined: (displayName: string) => Promise<boolean>;
+  onLeaveRoomShortcut: (callback: () => void) => () => void;
   screenCapture: ScreenCaptureApi;
 }
