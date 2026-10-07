@@ -6,19 +6,28 @@ import RoomPage from './pages/RoomPage';
 import { createSignalingClient } from './lib/signaling-client';
 import type { RoomSnapshot } from '../shared/types/signaling';
 import { useRoomWebRtc } from './features/streaming/use-room-webrtc';
+import { useScreenCapture } from './features/streaming/use-screen-capture';
 
 export default function App() {
   const [page, setPage] = useState<'home' | 'create-room' | 'join-room' | 'room'>('home');
   const [socket] = useState(createSignalingClient);
   const [room, setRoom] = useState<RoomSnapshot | null>(null);
   const [homeNotice, setHomeNotice] = useState('');
-  const connectionStates = useRoomWebRtc(socket, room);
+  const screenCapture = useScreenCapture();
+  const { connectionStates, remoteStreams } = useRoomWebRtc(socket, room, screenCapture.stream);
+
+  useEffect(() => {
+    if (!room && screenCapture.stream) {
+      screenCapture.stopCapture();
+    }
+  }, [room, screenCapture.stream, screenCapture.stopCapture]);
 
   useEffect(() => {
     const handleRoomUpdated = (updatedRoom: RoomSnapshot) => {
       setRoom((currentRoom) => currentRoom?.id === updatedRoom.id ? updatedRoom : currentRoom);
     };
     const handleRoomClosed = ({ reason }: { reason: 'host-left' | 'expired' }) => {
+      screenCapture.stopCapture();
       setRoom(null);
       setPage('home');
       setHomeNotice(reason === 'expired' ? 'A sala expirou.' : 'O host encerrou a sala.');
@@ -31,7 +40,7 @@ export default function App() {
       socket.off('room:closed', handleRoomClosed);
       socket.disconnect();
     };
-  }, [socket]);
+  }, [socket, screenCapture.stopCapture]);
 
   if (page === 'create-room') {
     return (
@@ -67,7 +76,20 @@ export default function App() {
         room={room}
         socket={socket}
         connectionStates={connectionStates}
+        localStream={screenCapture.stream}
+        remoteStreams={remoteStreams}
+        captureSources={screenCapture.sources}
+        isLoadingSources={screenCapture.isLoadingSources}
+        isPreparingSource={screenCapture.isPreparingSource}
+        isStartingCapture={screenCapture.isStartingCapture}
+        preparedSourceId={screenCapture.preparedSourceId}
+        captureError={screenCapture.error}
+        onLoadSources={screenCapture.loadSources}
+        onPrepareSource={screenCapture.prepareSource}
+        onStartCapture={screenCapture.startCapture}
+        onStopCapture={screenCapture.stopCapture}
         onLeave={() => {
+          screenCapture.stopCapture();
           setRoom(null);
           setPage('home');
         }}

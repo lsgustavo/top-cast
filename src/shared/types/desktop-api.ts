@@ -5,6 +5,24 @@ export interface AppInfo {
   chrome: string;
 }
 
+export interface CaptureSource {
+  id: string;
+  name: string;
+  kind: 'screen' | 'window';
+  displayId: string;
+  thumbnailDataUrl: string;
+}
+
+export type CaptureSourceSelection =
+  | { ok: true }
+  | { ok: false; error: 'SOURCE_NOT_AVAILABLE' | 'UNAUTHORIZED' };
+
+export interface ScreenCaptureApi {
+  listSources: () => Promise<CaptureSource[]>;
+  selectSource: (sourceId: string | null) => Promise<CaptureSourceSelection>;
+}
+
 export interface TopCastApi {
   getAppInfo: () => AppInfo;
+  screenCapture: ScreenCaptureApi;
 }

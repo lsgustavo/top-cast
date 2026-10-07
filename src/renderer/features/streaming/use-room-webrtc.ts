@@ -30,9 +30,15 @@ function relayWithAcknowledgment(
   });
 }
 
-export function useRoomWebRtc(socket: SignalingClient, room: RoomSnapshot | null) {
+export function useRoomWebRtc(
+  socket: SignalingClient,
+  room: RoomSnapshot | null,
+  localStream: MediaStream | null,
+) {
   const [connectionStates, setConnectionStates] = useState<Record<string, PeerConnectionStatus>>({});
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const peerConnectionsRef = useRef(new Map<string, RTCPeerConnection>());
+  const videoSendersRef = useRef(new Map<string, RTCRtpSender>());
   const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>());
   const roomRef = useRef<RoomSnapshot | null>(room);
   roomRef.current = room;
@@ -101,6 +107,20 @@ export function useRoomWebRtc(socket: SignalingClient, room: RoomSnapshot | null
         event.channel.onclose = () => {
           updateStatus(peerId, 'disconnected');
         };
+      };
+
+      connection.ontrack = (event) => {
+        const [stream] = event.streams;
+        const receivedStream = stream ?? new MediaStream([event.track]);
+        const updateRemoteStream = () => {
+          setRemoteStreams((current) => ({
+            ...current,
+            [peerId]: receivedStream,
+          }));
+        };
+        event.track.addEventListener('unmute', updateRemoteStream);
+        event.track.addEventListener('mute', updateRemoteStream);
+        updateRemoteStream();
       };
 
       if (isHost) {
@@ -204,7 +224,9 @@ export function useRoomWebRtc(socket: SignalingClient, room: RoomSnapshot | null
         connection.close();
       }
       peerConnectionsRef.current.clear();
+      videoSendersRef.current.clear();
       pendingCandidatesRef.current.clear();
+      setRemoteStreams({});
     };
   }, [socket]);
 
@@ -214,8 +236,10 @@ export function useRoomWebRtc(socket: SignalingClient, room: RoomSnapshot | null
         connection.close();
       }
       peerConnectionsRef.current.clear();
+      videoSendersRef.current.clear();
       pendingCandidatesRef.current.clear();
       setConnectionStates({});
+      setRemoteStreams({});
       return;
     }
 
@@ -229,7 +253,13 @@ export function useRoomWebRtc(socket: SignalingClient, room: RoomSnapshot | null
       if (!participantsById.has(peerId)) {
         connection.close();
         peerConnectionsRef.current.delete(peerId);
+        videoSendersRef.current.delete(peerId);
         pendingCandidatesRef.current.delete(peerId);
+        setRemoteStreams((current) => {
+          const next = { ...current };
+          delete next[peerId];
+          return next;
+        });
         setConnectionStates((current) => {
           const next = { ...current };
           delete next[peerId];
@@ -249,13 +279,31 @@ export function useRoomWebRtc(socket: SignalingClient, room: RoomSnapshot | null
 
       const connection = createHostConnection();
       peerConnectionsRef.current.set(participant.id, connection);
-      void negotiateHostConnection(socket, participant.id, connection, (status) => {
-        setConnectionStates((current) => ({ ...current, [participant.id]: status }));
+      const videoSender = connection.addTransceiver('video', { direction: 'sendonly' }).sender;
+      videoSendersRef.current.set(participant.id, videoSender);
+      void negotiateHostConnection(
+        socket,
+        participant.id,
+        connection,
+        videoSender,
+        localStream?.getVideoTracks()[0] ?? null,
+        (status) => {
+          setConnectionStates((current) => ({ ...current, [participant.id]: status }));
+        },
+      );
+    }
+  }, [room, socket, localStream]);
+
+  useEffect(() => {
+    const videoTrack = localStream?.getVideoTracks()[0] ?? null;
+    for (const [peerId, sender] of videoSendersRef.current) {
+      void sender.replaceTrack(videoTrack).catch(() => {
+        setConnectionStates((current) => ({ ...current, [peerId]: 'failed' }));
       });
     }
-  }, [room, socket]);
+  }, [localStream]);
 
-  return connectionStates;
+  return { connectionStates, remoteStreams };
 }
 
 function createHostConnection(): RTCPeerConnection {
@@ -266,6 +314,8 @@ async function negotiateHostConnection(
   socket: SignalingClient,
   peerId: string,
   connection: RTCPeerConnection,
+  videoSender: RTCRtpSender,
+  videoTrack: MediaStreamTrack | null,
   updateStatus: (status: PeerConnectionStatus) => void,
 ): Promise<void> {
   connection.onicecandidate = (event) => {
@@ -314,6 +364,7 @@ async function negotiateHostConnection(
   controlChannel.onclose = () => updateStatus('disconnected');
 
   try {
+    await videoSender.replaceTrack(videoTrack);
     const offer = await connection.createOffer();
     await connection.setLocalDescription(offer);
     const localDescription = connection.localDescription;

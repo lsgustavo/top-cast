@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APP_NAME } from '../../shared/constants/app.js';
+import { configureScreenCapture } from '../services/screen-capture.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +21,7 @@ export function createMainWindow(): BrowserWindow {
       nodeIntegration: false,
     },
   });
+  configureScreenCapture(mainWindow);
 
   if (app.isPackaged) {
     void mainWindow.loadFile(path.join(app.getAppPath(), 'dist/index.html'));

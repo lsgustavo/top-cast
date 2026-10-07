@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button';
 import type { RoomSnapshot } from '../../shared/types/signaling';
+import type { CaptureSource } from '../../shared/types/desktop-api';
 import type { SignalingClient } from '../lib/signaling-client';
 import type { PeerConnectionStatus } from '../features/streaming/use-room-webrtc';
 
@@ -8,6 +9,18 @@ interface RoomPageProps {
   room: RoomSnapshot;
   socket: SignalingClient;
   connectionStates: Record<string, PeerConnectionStatus>;
+  localStream: MediaStream | null;
+  remoteStreams: Record<string, MediaStream>;
+  captureSources: CaptureSource[];
+  isLoadingSources: boolean;
+  isPreparingSource: boolean;
+  isStartingCapture: boolean;
+  preparedSourceId: string | null;
+  captureError: string | null;
+  onLoadSources: () => Promise<CaptureSource[]>;
+  onPrepareSource: (sourceId: string | null) => Promise<boolean>;
+  onStartCapture: () => Promise<boolean>;
+  onStopCapture: () => void;
   onLeave: () => void;
 }
 
@@ -18,10 +31,72 @@ const connectionLabels: Record<PeerConnectionStatus, string> = {
   failed: 'Falha na conexão',
 };
 
-export default function RoomPage({ room, socket, connectionStates, onLeave }: RoomPageProps) {
+function StreamVideo({ stream, muted = false }: { stream: MediaStream; muted?: boolean }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (videoElement) {
+      videoElement.srcObject = stream;
+    }
+    return () => {
+      if (videoElement) {
+        videoElement.srcObject = null;
+      }
+    };
+  }, [stream]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted={muted}
+      className="h-full w-full bg-black object-contain"
+    />
+  );
+}
+
+function ScreenIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export default function RoomPage({
+  room,
+  socket,
+  connectionStates,
+  localStream,
+  remoteStreams,
+  captureSources,
+  isLoadingSources,
+  isPreparingSource,
+  isStartingCapture,
+  preparedSourceId,
+  captureError,
+  onLoadSources,
+  onPrepareSource,
+  onStartCapture,
+  onStopCapture,
+  onLeave,
+}: RoomPageProps) {
   const [copyMessage, setCopyMessage] = useState('');
   const [isLeaving, setIsLeaving] = useState(false);
+  const [isSourcePickerOpen, setIsSourcePickerOpen] = useState(false);
+  const [sourceKind, setSourceKind] = useState<CaptureSource['kind']>('screen');
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const isHost = room.participants.some((participant) => participant.id === socket.id && participant.role === 'host');
+  const host = room.participants.find((participant) => participant.role === 'host');
+  const remoteHostStream = host ? remoteStreams[host.id] ?? null : null;
+  const presentationStream = isHost ? localStream : remoteHostStream;
+  const isReceivingVideo = presentationStream !== null && (
+    isHost || presentationStream.getVideoTracks().some((track) => !track.muted && track.readyState === 'live')
+  );
+  const filteredSources = captureSources.filter((source) => source.kind === sourceKind);
 
   async function handleCopyCode() {
     try {
@@ -32,8 +107,39 @@ export default function RoomPage({ room, socket, connectionStates, onLeave }: Ro
     }
   }
 
+  function openSourcePicker() {
+    setSelectedSourceId(null);
+    void onPrepareSource(null);
+    setIsSourcePickerOpen(true);
+    void onLoadSources();
+  }
+
+  async function handleSelectSource(sourceId: string) {
+    setSelectedSourceId(sourceId);
+    if (!await onPrepareSource(sourceId)) {
+      setSelectedSourceId(null);
+    }
+  }
+
+  function closeSourcePicker() {
+    setSelectedSourceId(null);
+    void onPrepareSource(null);
+    setIsSourcePickerOpen(false);
+  }
+
+  async function handleStartCapture() {
+    if (!selectedSourceId || preparedSourceId !== selectedSourceId) {
+      return;
+    }
+    const started = await onStartCapture();
+    if (started) {
+      setIsSourcePickerOpen(false);
+    }
+  }
+
   function handleLeave() {
     setIsLeaving(true);
+    onStopCapture();
     socket.emit('room:leave', () => onLeave());
   }
 
@@ -41,7 +147,7 @@ export default function RoomPage({ room, socket, connectionStates, onLeave }: Ro
     <main className="relative min-h-screen overflow-hidden bg-[#0b1020] px-5 py-6 text-slate-50 sm:px-8">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.1),transparent_48%)]" />
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-5xl flex-col">
+      <div className="relative mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col">
         <header className="flex items-center justify-between border-b border-slate-800/80 pb-5">
           <div>
             <h1 className="text-base font-semibold">Sala de transmissão</h1>
@@ -53,38 +159,52 @@ export default function RoomPage({ room, socket, connectionStates, onLeave }: Ro
         </header>
 
         <div className="grid flex-1 gap-6 py-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center">
-          <section className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-slate-800 bg-slate-900/60 p-6 text-center shadow-xl shadow-black/10 sm:p-10">
-            <div className="grid h-16 w-16 place-items-center rounded-2xl border border-blue-400/15 bg-blue-500/10 text-blue-300">
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-7 w-7">
-                <rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.7" />
-                <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-              </svg>
-            </div>
-            <p className="mt-6 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Sala pronta</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight">Compartilhe o convite</h2>
-            <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">
-              Envie este código para as pessoas que deseja convidar. Ele expira em 24 horas.
-            </p>
-
-            <div className="mt-7 flex w-full max-w-sm items-center justify-between gap-3 rounded-2xl border border-slate-700 bg-slate-950/60 px-5 py-4">
-              <span className="font-mono text-2xl font-semibold tracking-[0.2em] text-slate-100">{room.inviteCode}</span>
-              <Button type="button" variant="secondary" size="sm" onClick={() => void handleCopyCode()}>
-                Copiar
-              </Button>
-            </div>
-            <p aria-live="polite" className="mt-2 min-h-4 text-xs text-slate-400">{copyMessage}</p>
-
-            {isHost ? (
-              <Button type="button" size="lg" disabled className="mt-5 min-w-48 bg-blue-600 text-white">
-                Iniciar transmissão
-              </Button>
+          <section className="flex min-h-[420px] flex-col items-center justify-center overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl shadow-black/10 sm:p-7">
+            {presentationStream && isReceivingVideo ? (
+              <>
+                <div className="mb-4 flex w-full items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
+                    <span className="h-2 w-2 rounded-full bg-red-400" />
+                    {isHost ? 'Sua tela está sendo compartilhada' : `${host?.displayName ?? 'Host'} está compartilhando`}
+                  </div>
+                  {isHost && (
+                    <Button type="button" variant="secondary" size="sm" onClick={onStopCapture}>
+                      Parar compartilhamento
+                    </Button>
+                  )}
+                </div>
+                <div className="aspect-video w-full overflow-hidden rounded-2xl border border-slate-800 bg-black">
+                  <StreamVideo stream={presentationStream} muted={isHost} />
+                </div>
+              </>
             ) : (
-              <p className="mt-5 rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 text-sm text-slate-400">
-                Aguardando o host iniciar a transmissão.
+              <>
+                <div className="grid h-16 w-16 place-items-center rounded-2xl border border-blue-400/15 bg-blue-500/10 text-blue-300">
+                  <ScreenIcon className="h-7 w-7" />
+                </div>
+                <p className="mt-6 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Sala pronta</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                  {isHost ? 'Compartilhe sua tela' : 'Aguardando transmissão'}
+                </h2>
+                <p className="mt-3 max-w-md text-center text-sm leading-6 text-slate-400">
+                  {isHost
+                    ? 'Escolha um monitor inteiro ou uma janela específica para compartilhar com a sala.'
+                    : 'O vídeo da tela compartilhada aparecerá aqui quando o host iniciar.'}
+                </p>
+                {isHost && (
+                  <Button type="button" size="lg" onClick={openSourcePicker} className="mt-7 bg-blue-600 text-white hover:bg-blue-500">
+                    <ScreenIcon className="mr-2 h-4 w-4" />
+                    Compartilhar tela
+                  </Button>
+                )}
+              </>
+            )}
+
+            {captureError && isHost && (
+              <p role="alert" className="mt-4 w-full rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm text-red-200">
+                {captureError}
               </p>
             )}
-            <p className="mt-3 text-xs text-slate-500">A captura de tela será habilitada em uma etapa posterior.</p>
-            <p className="mt-2 text-xs text-slate-600">Canal WebRTC de controle; ainda sem transmissão de mídia.</p>
           </section>
 
           <aside className="space-y-4">
@@ -121,9 +241,16 @@ export default function RoomPage({ room, socket, connectionStates, onLeave }: Ro
               </ul>
             </section>
 
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
-              <p className="text-xs font-medium text-slate-300">Convite válido até</p>
-              <p className="mt-1 text-sm text-slate-400">{new Date(room.expiresAt).toLocaleString()}</p>
+            <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+              <h2 className="text-sm font-semibold text-slate-200">Código do convite</h2>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <span className="font-mono text-lg font-semibold tracking-[0.16em] text-slate-100">{room.inviteCode}</span>
+                <Button type="button" variant="secondary" size="sm" onClick={() => void handleCopyCode()}>
+                  Copiar
+                </Button>
+              </div>
+              <p aria-live="polite" className="mt-2 min-h-4 text-xs text-slate-400">{copyMessage}</p>
+              <p className="mt-1 text-xs text-slate-500">Válido até {new Date(room.expiresAt).toLocaleString()}</p>
             </section>
 
             <Button
@@ -138,6 +265,107 @@ export default function RoomPage({ room, socket, connectionStates, onLeave }: Ro
           </aside>
         </div>
       </div>
+
+      {isSourcePickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="capture-dialog-title"
+            className="flex max-h-[min(760px,90vh)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50"
+          >
+            <header className="flex items-start justify-between border-b border-slate-800 px-5 py-4 sm:px-6">
+              <div>
+                <h2 id="capture-dialog-title" className="text-lg font-semibold">Escolha o que compartilhar</h2>
+                <p className="mt-1 text-sm text-slate-400">Somente o vídeo da tela será capturado nesta etapa.</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" aria-label="Fechar" onClick={closeSourcePicker}>
+                <span aria-hidden="true" className="text-xl leading-none">×</span>
+              </Button>
+            </header>
+
+            <div className="flex gap-2 border-b border-slate-800 px-5 py-3 sm:px-6">
+              {(['screen', 'window'] as const).map((kind) => (
+                <Button
+                  key={kind}
+                  type="button"
+                  variant={sourceKind === kind ? 'secondary' : 'ghost'}
+                  onClick={() => {
+                    setSourceKind(kind);
+                    setSelectedSourceId(null);
+                    void onPrepareSource(null);
+                  }}
+                  aria-pressed={sourceKind === kind}
+                  className="text-slate-200"
+                >
+                  {kind === 'screen' ? 'Monitores' : 'Janelas'}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={isLoadingSources}
+                onClick={() => void onLoadSources()}
+                className="ml-auto text-slate-400"
+              >
+                {isLoadingSources ? 'Atualizando…' : 'Atualizar'}
+              </Button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+              {isLoadingSources && captureSources.length === 0 && (
+                <p role="status" className="py-12 text-center text-sm text-slate-400">Buscando monitores e janelas…</p>
+              )}
+              {!isLoadingSources && filteredSources.length === 0 && (
+                <p className="py-12 text-center text-sm text-slate-400">
+                  Nenhuma {sourceKind === 'screen' ? 'tela' : 'janela'} disponível. Atualize a lista ou escolha outra categoria.
+                </p>
+              )}
+              {captureError && (
+                <p role="alert" className="mb-4 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2.5 text-sm leading-5 text-red-200">
+                  {captureError}
+                </p>
+              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                {filteredSources.map((source) => (
+                  <button
+                    key={source.id}
+                    type="button"
+                    disabled={isPreparingSource}
+                    onClick={() => void handleSelectSource(source.id)}
+                    aria-pressed={selectedSourceId === source.id}
+                    className={`overflow-hidden rounded-xl border text-left transition ${
+                      selectedSourceId === source.id
+                        ? 'border-blue-400 ring-2 ring-blue-400/30'
+                        : 'border-slate-700 hover:border-slate-500'
+                    }`}
+                  >
+                    <img src={source.thumbnailDataUrl} alt="" className="aspect-video w-full bg-slate-950 object-cover" />
+                    <span className="block truncate px-3 py-2.5 text-sm text-slate-200">{source.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <footer className="flex flex-col-reverse gap-2 border-t border-slate-800 px-5 py-4 sm:flex-row sm:justify-between sm:px-6">
+              <p className="self-center text-xs text-slate-500">Qualidade inicial: até 720p · 30 FPS</p>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={closeSourcePicker}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  disabled={!selectedSourceId || preparedSourceId !== selectedSourceId || isPreparingSource || isStartingCapture}
+                  onClick={() => void handleStartCapture()}
+                  className="bg-blue-600 text-white hover:bg-blue-500"
+                >
+                  {isPreparingSource ? 'Preparando…' : isStartingCapture ? 'Iniciando…' : 'Compartilhar'}
+                </Button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
