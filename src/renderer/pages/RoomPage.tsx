@@ -9,6 +9,7 @@ import type { PeerConnectionStatus } from '../features/streaming/use-room-webrtc
 interface RoomPageProps {
   room: RoomSnapshot;
   socket: SignalingClient;
+  selfParticipantId: string | null;
   signalingStatus: SignalingStatus;
   connectionStates: Record<string, PeerConnectionStatus>;
   localStream: MediaStream | null;
@@ -42,6 +43,15 @@ const connectionLabels: Record<PeerConnectionStatus, string> = {
   connected: 'WebRTC conectado',
   disconnected: 'Conexão interrompida',
   failed: 'Falha na conexão',
+};
+
+const connectionIndicatorClasses: Record<PeerConnectionStatus | 'waiting' | 'reconnecting', string> = {
+  connecting: 'bg-amber-300',
+  connected: 'bg-emerald-400',
+  disconnected: 'bg-amber-500',
+  failed: 'bg-red-400',
+  waiting: 'bg-slate-600',
+  reconnecting: 'bg-amber-300',
 };
 
 function StreamVideo({ stream, muted = false }: { stream: MediaStream; muted?: boolean }) {
@@ -82,6 +92,7 @@ function ScreenIcon({ className = 'h-5 w-5' }: { className?: string }) {
 export default function RoomPage({
   room,
   socket,
+  selfParticipantId,
   signalingStatus,
   connectionStates,
   localStream,
@@ -114,7 +125,7 @@ export default function RoomPage({
   const [isSourcePickerOpen, setIsSourcePickerOpen] = useState(false);
   const [sourceKind, setSourceKind] = useState<CaptureSource['kind']>('screen');
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
-  const isHost = room.participants.some((participant) => participant.id === socket.id && participant.role === 'host');
+  const isHost = room.participants.some((participant) => participant.id === selfParticipantId && participant.role === 'host');
   const host = room.participants.find((participant) => participant.role === 'host');
   const remoteHostStream = host ? remoteStreams[host.id] ?? null : null;
   const presentationStream = isHost ? localStream : remoteHostStream;
@@ -256,30 +267,43 @@ export default function RoomPage({
               </div>
 
               <ul className="mt-4 space-y-2">
-                {room.participants.map((participant) => (
-                  <li key={participant.id} className="flex items-center gap-3 rounded-xl bg-slate-950/40 p-3">
-                    <div className={`grid h-10 w-10 place-items-center rounded-full ${participant.role === 'host' ? 'bg-blue-500/15 text-blue-200' : 'bg-slate-800 text-slate-300'}`}>
-                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-                        <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.6" />
-                        <path d="M5.5 20c.5-3.4 2.7-5.2 6.5-5.2s6 1.8 6.5 5.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                      </svg>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-100">{participant.displayName}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {participant.id === socket.id
-                          ? participant.role === 'host' ? 'Você · Host' : 'Você'
-                          : connectionStates[participant.id]
-                            ? connectionLabels[connectionStates[participant.id]]
-                            : participant.role === 'host' ? 'Host · aguardando WebRTC' : 'Aguardando conexão WebRTC'}
-                      </p>
-                      <p className={`mt-1 text-xs ${participant.microphoneEnabled ? 'text-emerald-300' : 'text-slate-500'}`}>
-                        {participant.microphoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}
-                      </p>
-                    </div>
-                    <span className="h-2 w-2 rounded-full bg-emerald-400" aria-label="Conectado" />
-                  </li>
-                ))}
+                {room.participants.map((participant) => {
+                  const isSelf = participant.id === selfParticipantId;
+                  const peerStatus = connectionStates[participant.id];
+                  const connectionStatus = isSelf
+                    ? signalingStatus === 'connected' ? 'connected' : 'reconnecting'
+                    : peerStatus ?? 'waiting';
+                  const connectionLabel = isSelf
+                    ? signalingStatus === 'connected' ? 'Sinalização conectada' : signalingStatus === 'restoring' ? 'Restaurando sala' : 'Reconectando sinalização'
+                    : peerStatus ? connectionLabels[peerStatus] : 'Aguardando conexão WebRTC';
+
+                  return (
+                    <li key={participant.id} className="flex items-center gap-3 rounded-xl bg-slate-950/40 p-3">
+                      <div className={`grid h-10 w-10 place-items-center rounded-full ${participant.role === 'host' ? 'bg-blue-500/15 text-blue-200' : 'bg-slate-800 text-slate-300'}`}>
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                          <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.6" />
+                          <path d="M5.5 20c.5-3.4 2.7-5.2 6.5-5.2s6 1.8 6.5 5.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-100">{participant.displayName}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {isSelf
+                            ? participant.role === 'host' ? 'Você · Host' : 'Você'
+                            : participant.role === 'host' ? `Host · ${connectionLabel}` : connectionLabel}
+                        </p>
+                        <p className={`mt-1 text-xs ${participant.microphoneEnabled ? 'text-emerald-300' : 'text-slate-500'}`}>
+                          {participant.microphoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}
+                        </p>
+                      </div>
+                      <span
+                        className={`h-2 w-2 rounded-full ${connectionIndicatorClasses[connectionStatus]}`}
+                        role="img"
+                        aria-label={connectionLabel}
+                      />
+                    </li>
+                  );
+                })}
               </ul>
             </section>
 

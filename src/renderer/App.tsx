@@ -9,12 +9,7 @@ import { createRoom as requestRoomCreation, joinRoom as requestRoomJoin } from '
 import { useRoomWebRtc } from './features/streaming/use-room-webrtc';
 import { useScreenCapture } from './features/streaming/use-screen-capture';
 import { useMicrophone } from './features/streaming/use-microphone';
-
-interface ReconnectIdentity {
-  inviteCode: string;
-  displayName: string;
-  role: 'host' | 'guest';
-}
+import { getReconnectIdentity, type ReconnectIdentity } from './lib/reconnect-identity';
 
 const SIGNALING_URL_STORAGE_KEY = 'topcast:signaling-url';
 const DEFAULT_SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL ?? 'http://127.0.0.1:3001';
@@ -105,13 +100,11 @@ export default function App() {
     };
     const handleDisconnect = () => {
       const activeRoom = roomRef.current;
-      const participant = activeRoom?.participants.find((candidate) => candidate.id === socket.id);
-      if (activeRoom && participant) {
-        reconnectIdentityRef.current = {
-          inviteCode: activeRoom.inviteCode,
-          displayName: participant.displayName,
-          role: participant.role,
-        };
+      if (activeRoom && !reconnectIdentityRef.current) {
+        const participant = activeRoom.participants.find((candidate) => candidate.id === socket.id);
+        if (participant) {
+          reconnectIdentityRef.current = getReconnectIdentity(activeRoom, participant.id);
+        }
       }
       setSignalingStatus('reconnecting');
     };
@@ -147,6 +140,7 @@ export default function App() {
           }
           if (cancelled) return;
           setRoom(result.room);
+          reconnectIdentityRef.current = getReconnectIdentity(result.room, socket.id);
           setPage('room');
           setHomeNotice('Conexão restaurada. A sala anterior foi encerrada; compartilhe o novo código de convite.');
         } else {
@@ -156,17 +150,18 @@ export default function App() {
           }
           if (cancelled) return;
           setRoom(result.room);
+          reconnectIdentityRef.current = getReconnectIdentity(result.room, socket.id);
           setPage('room');
           setHomeNotice('');
         }
       } catch (error) {
         if (cancelled) return;
+        reconnectIdentityRef.current = null;
         setRoom(null);
         setPage('home');
         setHomeNotice(error instanceof Error ? error.message : 'Não foi possível restaurar a sala.');
       } finally {
         if (!cancelled) {
-          reconnectIdentityRef.current = null;
           setSignalingStatus('connected');
         }
       }
@@ -195,7 +190,7 @@ export default function App() {
         socket={socket}
         onBack={() => setPage('home')}
         onRoomCreated={(createdRoom) => {
-          reconnectIdentityRef.current = null;
+          reconnectIdentityRef.current = getReconnectIdentity(createdRoom, socket.id);
           setHomeNotice('');
           setRoom(createdRoom);
           setPage('room');
@@ -210,7 +205,7 @@ export default function App() {
         socket={socket}
         onBack={() => setPage('home')}
         onRoomJoined={(joinedRoom) => {
-          reconnectIdentityRef.current = null;
+          reconnectIdentityRef.current = getReconnectIdentity(joinedRoom, socket.id);
           setHomeNotice('');
           setRoom(joinedRoom);
           setPage('room');
@@ -224,6 +219,11 @@ export default function App() {
       <RoomPage
         room={room}
         socket={socket}
+        selfParticipantId={
+          room.participants.find((participant) => participant.id === socket.id)?.id ??
+          reconnectIdentityRef.current?.participantId ??
+          null
+        }
         signalingStatus={signalingStatus}
         connectionStates={connectionStates}
         localStream={screenCapture.stream}

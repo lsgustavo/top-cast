@@ -79,16 +79,16 @@ alheios ao escopo nesses commits.
 - [x] Tratar indisponibilidade do serviço ICE com estado/erro explícito, sem
   simular sucesso.
 - [x] Cobrir as regras de seleção/configuração com testes e validar build.
-- [x] Commit próprio após validação (`pendente` até gravar este commit).
+- [x] Commit próprio após validação (`b05bafb`).
 
 ### Etapa 4 — Estabilização de conexão e participantes
 
-- [ ] Verificar que estados de participantes e conexões refletem conexões e
+- [x] Verificar que estados de participantes e conexões refletem conexões e
   desconexões reais, inclusive entrada/saída e falha WebRTC.
-- [ ] Revisar reconexão do signaling, retorno do host com novo convite,
+- [x] Revisar reconexão do signaling, retorno do host com novo convite,
   reentrada de convidados e encerramento/expiração da sala.
-- [ ] Corrigir os casos reproduzíveis e cobrir a lógica com testes.
-- [ ] Commit próprio após validação.
+- [x] Corrigir os casos reproduzíveis e cobrir a lógica com testes.
+- [x] Commit próprio após validação.
 
 ### Etapa 5 — Testes de ponta a ponta e critérios de rede
 
