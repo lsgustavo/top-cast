@@ -9,6 +9,8 @@
     "dev:server": "tsx watch src/server/index.ts",
     "dev:electron": "tsc -p tsconfig.node.json && wait-on tcp:4173 tcp:3001 && electron dist-electron/main/main.js",
     "build": "tsc -p tsconfig.node.json && tsc -p tsconfig.server.json && tsc -p tsconfig.app.json && vite build",
+    "build:windows": "npm run build && node scripts/verify-production-build.mjs",
+    "verify:production": "node scripts/verify-production-build.mjs",
     "preview": "vite preview --host",
     "test": "tsx --test src/server/services/room-service.test.ts src/server/services/signaling-validation.test.ts"
   },
