@@ -409,17 +409,29 @@ export default function RoomPage({
               </Select>
             );
           })}
+          </div>
+        </div>
+      </aside>
+
+      <div className="relative mx-auto flex min-h-[calc(100vh-1rem)] w-full max-w-[1600px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-800/80 pb-4 [-webkit-app-region:drag]">
+          <div>
+            <h2 className="text-base font-semibold">Sala de transmissão</h2>
+            <p className="mt-1 text-xs text-slate-500">{isHost ? 'Compartilhe sua tela com a sala' : 'Acompanhe a transmissão'}</p>
+          </div>
+          <div className="shrink-0 [-webkit-app-region:no-drag]">
             {isHost ? (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     type="button"
-                    variant="default"
+                    variant="ghost"
+                    size="sm"
                     disabled={isLeaving}
-                    className="mt-2 w-full justify-start gap-2 bg-red-600 text-white hover:bg-red-500"
+                    className="h-8 gap-2 px-2.5 text-red-300 hover:bg-red-400/10 hover:text-red-200"
                   >
                     <LogOut className="h-4 w-4" />
-                    {isLeaving ? 'Encerrando…' : 'Encerrar Sala'}
+                    {isLeaving ? 'Encerrando…' : 'Encerrar sala'}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="max-w-[440px] overflow-hidden p-0">
@@ -447,24 +459,16 @@ export default function RoomPage({
             ) : (
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
+                size="sm"
                 disabled={isLeaving}
                 onClick={handleLeave}
-                className="mt-2 w-full justify-start gap-2 border-slate-700 text-slate-300 hover:border-red-400/30 hover:bg-red-400/[0.06] hover:text-red-200"
+                className="h-8 gap-2 px-2.5 text-slate-400 hover:bg-red-400/10 hover:text-red-200"
               >
                 <LogOut className="h-4 w-4" />
-                {isLeaving ? 'Saindo…' : 'Sair da Sala'}
+                {isLeaving ? 'Saindo…' : 'Sair da sala'}
               </Button>
             )}
-          </div>
-        </div>
-      </aside>
-
-      <div className="relative mx-auto flex min-h-[calc(100vh-1rem)] w-full max-w-[1600px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5">
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-800/80 pb-4 [-webkit-app-region:drag]">
-          <div>
-            <h2 className="text-base font-semibold">Sala de transmissão</h2>
-            <p className="mt-1 text-xs text-slate-500">{isHost ? 'Compartilhe sua tela com a sala' : 'Acompanhe a transmissão'}</p>
           </div>
         </header>
 
