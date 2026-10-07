@@ -56,6 +56,7 @@ export class RoomService {
       displayName,
       role: 'host',
       joinedAt: now,
+      microphoneEnabled: false,
     };
 
     room.participants.set(socketId, participant);
@@ -115,6 +116,7 @@ export class RoomService {
       displayName,
       role: 'guest',
       joinedAt: now,
+      microphoneEnabled: false,
     };
     room.participants.set(socketId, participant);
     this.roomIdsBySocketId.set(socketId, room.id);
@@ -141,6 +143,18 @@ export class RoomService {
 
     room.participants.delete(socketId);
     return { roomId, roomClosed: false, snapshot: this.toSnapshot(room) };
+  }
+
+  setMicrophoneEnabled(socketId: string, enabled: boolean): RoomSnapshot | undefined {
+    const roomId = this.roomIdsBySocketId.get(socketId);
+    const room = roomId ? this.roomsById.get(roomId) : undefined;
+    const participant = room?.participants.get(socketId);
+    if (!room || !participant) {
+      return undefined;
+    }
+
+    participant.microphoneEnabled = enabled;
+    return this.toSnapshot(room);
   }
 
   authorizeSignal(

@@ -5,6 +5,7 @@ import {
   SIGNALING_PROTOCOL_VERSION,
   type ClientToServerEvents,
   type InterServerEvents,
+  type MicrophoneStateResult,
   type ServerToClientEvents,
   type SignalingSocketData,
   type WebRtcDescriptionPayload,
@@ -130,6 +131,28 @@ io.on('connection', (socket) => {
     }
 
     acknowledge({ ok: true });
+  });
+
+  socket.on('room:microphone', (payload, acknowledge) => {
+    if (typeof acknowledge !== 'function') {
+      app.log.warn({ socketId: socket.id }, 'Rejected room:microphone without acknowledgment callback');
+      return;
+    }
+
+    let result: MicrophoneStateResult;
+    if (typeof payload?.enabled !== 'boolean') {
+      result = { ok: false, error: 'INVALID_STATE' };
+    } else {
+      const snapshot = roomService.setMicrophoneEnabled(socket.id, payload.enabled);
+      if (!snapshot) {
+        result = { ok: false, error: 'NOT_IN_ROOM' };
+      } else {
+        io.to(snapshot.id).emit('room:updated', snapshot);
+        result = { ok: true };
+      }
+    }
+
+    acknowledge(result);
   });
 
   socket.on('webrtc:description', (payload, acknowledge) => {

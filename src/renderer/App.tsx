@@ -16,6 +16,7 @@ export default function App() {
   const [homeNotice, setHomeNotice] = useState('');
   const screenCapture = useScreenCapture();
   const microphone = useMicrophone();
+  const [microphoneSyncError, setMicrophoneSyncError] = useState<string | null>(null);
   const { connectionStates, remoteStreams } = useRoomWebRtc(
     socket,
     room,
@@ -50,6 +51,17 @@ export default function App() {
       socket.disconnect();
     };
   }, [socket, screenCapture.stopCapture, microphone.disable]);
+
+  useEffect(() => {
+    if (!room || !socket.connected) {
+      return;
+    }
+    socket.emit('room:microphone', { enabled: microphone.isEnabled }, (result) => {
+      setMicrophoneSyncError(
+        result.ok ? null : 'Não foi possível atualizar o estado do microfone na sala.',
+      );
+    });
+  }, [microphone.isEnabled, room?.id, socket]);
 
   if (page === 'create-room') {
     return (
@@ -99,7 +111,7 @@ export default function App() {
         isMicrophoneEnabled={microphone.isEnabled}
         isMicrophoneStarting={microphone.isStarting}
         captureError={screenCapture.error}
-        microphoneError={microphone.error}
+        microphoneError={microphone.error ?? microphoneSyncError}
         onLoadSources={screenCapture.loadSources}
         onPrepareSource={screenCapture.prepareSource}
         onStartCapture={screenCapture.startCapture}

@@ -13,6 +13,7 @@ export interface RoomParticipant {
   displayName: string;
   role: 'host' | 'guest';
   joinedAt: number;
+  microphoneEnabled: boolean;
 }
 
 export interface RoomSnapshot {
@@ -48,6 +49,10 @@ export interface JoinRoomPayload {
 export interface LeaveRoomResponse {
   ok: true;
 }
+
+export type MicrophoneStateResult =
+  | { ok: true }
+  | { ok: false; error: 'NOT_IN_ROOM' | 'INVALID_STATE' };
 
 export interface RoomClosedMessage {
   reason: 'host-left' | 'expired';
@@ -103,6 +108,10 @@ export interface ClientToServerEvents {
     acknowledge: (result: RoomOperationResult) => void,
   ) => void;
   'room:leave': (acknowledge: (result: LeaveRoomResponse) => void) => void;
+  'room:microphone': (
+    payload: { enabled: boolean },
+    acknowledge: (result: MicrophoneStateResult) => void,
+  ) => void;
   'webrtc:description': (
     payload: WebRtcDescriptionPayload,
     acknowledge: (result: WebRtcSignalResult) => void,

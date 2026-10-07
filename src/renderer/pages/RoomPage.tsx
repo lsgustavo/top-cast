@@ -255,6 +255,9 @@ export default function RoomPage({
                             ? connectionLabels[connectionStates[participant.id]]
                             : participant.role === 'host' ? 'Host · aguardando WebRTC' : 'Aguardando conexão WebRTC'}
                       </p>
+                      <p className={`mt-1 text-xs ${participant.microphoneEnabled ? 'text-emerald-300' : 'text-slate-500'}`}>
+                        {participant.microphoneEnabled ? 'Microfone ligado' : 'Microfone desligado'}
+                      </p>
                     </div>
                     <span className="h-2 w-2 rounded-full bg-emerald-400" aria-label="Conectado" />
                   </li>
