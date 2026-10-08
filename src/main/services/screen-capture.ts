@@ -94,28 +94,35 @@ session.defaultSession.setPermissionRequestHandler((webContents, permission, cal
     },
   );
 
-  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    const source = selectedSourceId ? availableSources.get(selectedSourceId) : undefined;
-    const includeSystemAudio = selectedSourceIncludesAudio;
-    const isAuthorizedFrame = request.frame !== null &&
+ session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+  const isAuthorizedFrame =
+    request.frame !== null &&
     activeWindow !== null &&
     !activeWindow.isDestroyed() &&
     request.frame.routingId === activeWindow.webContents.mainFrame.routingId;
 
-    selectedSourceId = null;
-    selectedSourceIncludesAudio = false;
-    if (!source || !request.videoRequested || !isAuthorizedFrame) {
-      callback(null);
-      return;
-    }
+  const source = selectedSourceId ? availableSources.get(selectedSourceId) : undefined;
+  const includeSystemAudio = selectedSourceIncludesAudio;
 
-    callback({
-      video: source,
-      ...(includeSystemAudio && request.audioRequested && process.platform === 'win32'
-        ? { audio: 'loopback' as const }
-        : {}),
-    });
-  }, { useSystemPicker: false });
+  selectedSourceId = null;
+  selectedSourceIncludesAudio = false;
+
+  if (!source || !request.videoRequested || !isAuthorizedFrame) {
+    callback(null);
+    return;
+  }
+
+  const isWholeScreen = source.id.startsWith('screen:');
+
+  const shouldAttachAudio = request.audioRequested && includeSystemAudio && !isWholeScreen;
+
+  callback({
+    video: source,
+    ...(shouldAttachAudio && process.platform === 'win32'
+      ? { audio: 'loopback' as const }
+      : {}),
+  });
+}, { useSystemPicker: false });
 
   window.on('closed', () => {
     if (activeWindow === window) {
@@ -130,27 +137,34 @@ function isAuthorizedSender(
   sender: Electron.WebContents,
   senderFrame: Electron.WebFrameMain,
 ): boolean {
-  return activeWindow !== null &&
+  return (
+    activeWindow !== null &&
     !activeWindow.isDestroyed() &&
     sender.id === activeWindow.webContents.id &&
-    senderFrame === activeWindow.webContents.mainFrame;
+    senderFrame.routingId === activeWindow.webContents.mainFrame.routingId
+  );
 }
 
 async function refreshSources(): Promise<CaptureSource[]> {
-  const sources = await desktopCapturer.getSources({
-    types: ['screen', 'window'],
-    thumbnailSize: { width: 320, height: 180 },
-    fetchWindowIcons: true,
-  });
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen', 'window'],
+      thumbnailSize: { width: 320, height: 180 },
+      fetchWindowIcons: false,
+    });
 
-  availableSources = new Map(sources.map((source) => [source.id, source]));
-  sourcesUpdatedAt = Date.now();
+    availableSources = new Map(sources.map((source) => [source.id, source]));
+    sourcesUpdatedAt = Date.now();
 
-  return sources.map((source) => ({
-    id: source.id,
-    name: source.name,
-    kind: source.id.startsWith('screen:') ? 'screen' : 'window',
-    displayId: source.display_id,
-    thumbnailDataUrl: source.thumbnail.toDataURL(),
-  }));
+    return sources.map((source) => ({
+      id: source.id,
+      name: source.name,
+      kind: source.id.startsWith('screen:') ? 'screen' : 'window',
+      displayId: source.display_id,
+      thumbnailDataUrl: source.thumbnail.toDataURL(),
+    }));
+  } catch (error) {
+    console.error('[ScreenCapture] Erro ao listar fontes de tela:', error);
+    return [];
+  }
 }
