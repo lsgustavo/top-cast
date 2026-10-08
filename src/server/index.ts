@@ -14,8 +14,8 @@ import {
   type SignalingSocketData,
 } from '../shared/types/signaling.js';
 
-const host = process.env.SIGNALING_HOST ?? '127.0.0.1';
-const port = Number(process.env.SIGNALING_PORT ?? 3001);
+const host = process.env.SIGNALING_HOST ?? '0.0.0.0';
+const port = Number(process.env.PORT ?? process.env.SIGNALING_PORT ?? 3001);
 const allowedOrigins = new Set([
   'http://localhost:4173',
   'http://127.0.0.1:4173',
@@ -27,7 +27,7 @@ const allowedOrigins = new Set([
 ]);
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error(`Invalid SIGNALING_PORT: ${process.env.SIGNALING_PORT}`);
+  throw new Error(`Invalid SIGNALING_PORT: ${process.env.PORT}`);
 }
 
 const app = Fastify({ logger: true });
