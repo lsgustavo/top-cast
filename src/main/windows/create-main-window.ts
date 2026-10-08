@@ -26,7 +26,7 @@ export function createMainWindow(): BrowserWindow {
     autoHideMenuBar: true,
     // icon: iconPath,
     webPreferences: {
-      preload: path.join(__dirname, '../../preload/preload.mjs'),
+      preload: path.join(__dirname, '../../preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },

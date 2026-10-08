@@ -32,10 +32,24 @@ export function configureScreenCapture(window: BrowserWindow): void {
   }
   handlersRegistered = true;
 
-  session.defaultSession.setPermissionCheckHandler(() => false);
-  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
-    callback(false);
-  });
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+  if (permission === 'display-capture' || permission === 'media') {
+    return true;
+  }
+  return false;
+});
+session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+  if (
+    activeWindow !== null &&
+    !activeWindow.isDestroyed() &&
+    webContents.id === activeWindow.webContents.id &&
+    (permission === 'display-capture' || permission === 'media')
+  ) {
+    callback(true);
+    return;
+  }
+  callback(false);
+});
 
   ipcMain.handle(LIST_SOURCES_CHANNEL, async (event): Promise<CaptureSource[]> => {
     if (!event.senderFrame || !isAuthorizedSender(event.sender, event.senderFrame)) {
@@ -84,8 +98,9 @@ export function configureScreenCapture(window: BrowserWindow): void {
     const source = selectedSourceId ? availableSources.get(selectedSourceId) : undefined;
     const includeSystemAudio = selectedSourceIncludesAudio;
     const isAuthorizedFrame = request.frame !== null &&
-      activeWindow !== null &&
-      request.frame === activeWindow.webContents.mainFrame;
+    activeWindow !== null &&
+    !activeWindow.isDestroyed() &&
+    request.frame.routingId === activeWindow.webContents.mainFrame.routingId;
 
     selectedSourceId = null;
     selectedSourceIncludesAudio = false;
