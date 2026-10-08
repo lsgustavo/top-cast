@@ -56,6 +56,15 @@ const joinAttemptsByAddress = new Map<string, { windowStartedAt: number; attempt
 const ICE_REQUEST_WINDOW_MS = 60_000;
 const MAX_ICE_REQUESTS_PER_WINDOW = 10;
 
+app.route({
+  method: ['GET', 'HEAD'],
+  url: '/',
+  handler: async () => ({
+    status: 'ok',
+    service: 'top-cast-signaling',
+  }),
+});
+
 app.get('/health', async () => ({
   status: 'ok',
   service: 'top-cast-signaling',
