@@ -706,9 +706,13 @@ async function handleCopyCode() {
                   />
                   <Volume2 className="h-4 w-4 shrink-0 text-slate-400" />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-slate-200">Incluir áudio do sistema</span>
+                    <span className="block text-sm font-medium text-slate-200">
+                      {sourceKind === 'window' ? 'Incluir áudio da janela' : 'Incluir áudio do sistema'}
+                    </span>
                     <span className="mt-0.5 block text-xs leading-5 text-slate-500">
-                      Captura a saída geral do Windows — inclusive áudio de chamadas e outros aplicativos.
+                      {sourceKind === 'window'
+                        ? 'Captura isolada do áudio deste aplicativo (WASAPI) — sem capturar chamadas do Discord ou outros sons de fundo.'
+                        : 'Captura a saída geral do Windows — inclusive áudio de chamadas e outros aplicativos.'}
                     </span>
                   </span>
                   <span className="hidden shrink-0 rounded-full border border-slate-700 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-slate-500 sm:inline">

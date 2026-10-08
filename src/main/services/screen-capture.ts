@@ -114,7 +114,7 @@ session.defaultSession.setPermissionRequestHandler((webContents, permission, cal
 
   const isWholeScreen = source.id.startsWith('screen:');
 
-  const shouldAttachAudio = request.audioRequested && includeSystemAudio && !isWholeScreen;
+  const shouldAttachAudio = request.audioRequested && includeSystemAudio && isWholeScreen;
 
   callback({
     video: source,

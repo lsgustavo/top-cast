@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { APP_NAME } from '../../shared/constants/app.js';
 import { configureNativeAppFeatures } from '../services/native-app-features.js';
 import { configureScreenCapture } from '../services/screen-capture.js';
+import { configureProcessAudioCapture } from '../services/process-audio-capture.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,6 +46,7 @@ export function createMainWindow(): BrowserWindow {
 
   configureNativeAppFeatures(mainWindow);
   configureScreenCapture(mainWindow);
+  configureProcessAudioCapture(mainWindow);
 
   if (app.isPackaged) {
     void mainWindow.loadFile(path.join(app.getAppPath(), 'dist/index.html'));

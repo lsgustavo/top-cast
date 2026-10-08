@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CaptureSource } from '../../../shared/types/desktop-api';
+import { createProcessAudioTrack, type ProcessAudioStreamController } from '../../lib/process-audio-stream';
 
 interface ScreenCaptureState {
   sources: CaptureSource[];
@@ -36,10 +37,13 @@ export function useScreenCapture() {
     error: null,
   });
   const streamRef = useRef<MediaStream | null>(null);
+  const processAudioRef = useRef<ProcessAudioStreamController | null>(null);
   const captureApi = window.topCast?.screenCapture;
   const supportsSystemAudio = captureApi?.supportsSystemAudio ?? false;
 
   const stopCapture = useCallback(() => {
+    processAudioRef.current?.stop();
+    processAudioRef.current = null;
     const stream = streamRef.current;
     streamRef.current = null;
     if (stream) {
@@ -119,25 +123,44 @@ export function useScreenCapture() {
 
     setState((current) => ({ ...current, isStartingCapture: true, error: null }));
     try {
-      // Call getDisplayMedia before awaiting anything so the click gesture remains active.
+      const isWindow = state.preparedSourceId.startsWith('window:');
+
+      // Chamada a getDisplayMedia: para tela cheia captura loopback padrão; para janela, o áudio isolado virá via WASAPI
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           frameRate: { ideal: 30, max: 30 },
           width: { ideal: 1280, max: 1280 },
           height: { ideal: 720, max: 720 },
         },
-        audio: state.includeSystemAudio,
+        audio: !isWindow && state.includeSystemAudio,
       });
       const [videoTrack] = stream.getVideoTracks();
       if (!videoTrack) {
         stream.getTracks().forEach((track) => track.stop());
         throw new Error('O Electron não retornou uma faixa de vídeo para a captura.');
       }
-      const systemAudioTrack = stream.getAudioTracks()[0] ?? null;
+
+      let systemAudioTrack = stream.getAudioTracks()[0] ?? null;
+
+      // Se for janela e o áudio estiver marcado, iniciar captura de áudio isolada pelo processo
+      if (isWindow && state.includeSystemAudio) {
+        try {
+          const controller = await createProcessAudioTrack(state.preparedSourceId);
+          if (controller) {
+            processAudioRef.current = controller;
+            stream.addTrack(controller.track);
+            systemAudioTrack = controller.track;
+          }
+        } catch (err) {
+          console.warn('[ScreenCapture] Falha ao capturar áudio isolado do processo:', err);
+        }
+      }
 
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = stream;
       videoTrack.addEventListener('ended', () => {
+        processAudioRef.current?.stop();
+        processAudioRef.current = null;
         if (streamRef.current === stream) {
           streamRef.current = null;
           setState((current) => ({
@@ -166,6 +189,8 @@ export function useScreenCapture() {
       }));
       return true;
     } catch (error) {
+      processAudioRef.current?.stop();
+      processAudioRef.current = null;
       const message = error instanceof Error ? error.message : 'Não foi possível iniciar o compartilhamento de tela.';
       setState((current) => ({
         ...current,
@@ -193,6 +218,8 @@ export function useScreenCapture() {
   }, []);
 
   useEffect(() => () => {
+    processAudioRef.current?.stop();
+    processAudioRef.current = null;
     const stream = streamRef.current;
     streamRef.current = null;
     stream?.getTracks().forEach((track) => track.stop());

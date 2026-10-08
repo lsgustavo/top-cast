@@ -23,10 +23,24 @@ export interface ScreenCaptureApi {
   selectSource: (sourceId: string | null, includeSystemAudio: boolean) => Promise<CaptureSourceSelection>;
 }
 
+export interface ProcessAudioChunk {
+  samples: Float32Array;
+  sampleRate: number;
+  channels: number;
+}
+
+export interface ProcessAudioApi {
+  isSupported: () => Promise<boolean>;
+  start: (sourceId: string) => Promise<{ ok: boolean; pid?: number; error?: string }>;
+  stop: () => Promise<boolean>;
+  onChunk: (callback: (chunk: ProcessAudioChunk) => void) => () => void;
+}
+
 export interface TopCastApi {
-  copyToClipboard: (text: string) => Promise<boolean>
+  copyToClipboard: (text: string) => Promise<boolean>;
   getAppInfo: () => AppInfo;
   notifyParticipantJoined: (displayName: string) => Promise<boolean>;
   onLeaveRoomShortcut: (callback: () => void) => () => void;
   screenCapture: ScreenCaptureApi;
+  processAudio: ProcessAudioApi;
 }

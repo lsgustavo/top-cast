@@ -1,6 +1,6 @@
 import { app, contextBridge, ipcRenderer } from 'electron';
 import { APP_NAME } from '../shared/constants/app.js';
-import type { TopCastApi } from '../shared/types/desktop-api.js';
+import type { ProcessAudioChunk, TopCastApi } from '../shared/types/desktop-api.js';
 
 const api: TopCastApi = {
     copyToClipboard: (text: string) =>
@@ -23,6 +23,16 @@ const api: TopCastApi = {
     const listener = () => callback();
     ipcRenderer.on('app:leave-room-shortcut', listener);
     return () => ipcRenderer.removeListener('app:leave-room-shortcut', listener);
+  },
+  processAudio: {
+    isSupported: () => ipcRenderer.invoke('app:is-process-audio-supported'),
+    start: (sourceId: string) => ipcRenderer.invoke('app:start-process-audio', sourceId),
+    stop: () => ipcRenderer.invoke('app:stop-process-audio'),
+    onChunk: (callback: (chunk: ProcessAudioChunk) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: ProcessAudioChunk) => callback(data);
+      ipcRenderer.on('app:process-audio-chunk', listener);
+      return () => ipcRenderer.removeListener('app:process-audio-chunk', listener);
+    },
   },
 };
 
