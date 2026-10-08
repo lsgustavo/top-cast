@@ -1,5 +1,6 @@
 import {
   BrowserWindow,
+  clipboard,
   globalShortcut,
   ipcMain,
   Notification,
@@ -9,6 +10,7 @@ const NOTIFY_PARTICIPANT_CHANNEL = 'app:notify-participant-joined';
 const LEAVE_ROOM_SHORTCUT_CHANNEL = 'app:leave-room-shortcut';
 const LEAVE_ROOM_SHORTCUT = 'CommandOrControl+Shift+L';
 const MAX_DISPLAY_NAME_LENGTH = 32;
+const COPY_TO_CLIPBOARD_CHANNEL = 'app:copy-to-clipboard';
 
 let activeWindow: BrowserWindow | null = null;
 let handlersRegistered = false;
@@ -20,6 +22,17 @@ export function configureNativeAppFeatures(window: BrowserWindow): void {
     return;
   }
   handlersRegistered = true;
+
+    ipcMain.handle(COPY_TO_CLIPBOARD_CHANNEL, (event, rawText: unknown): boolean => {
+    if (!isAuthorizedSender(event.sender, event.senderFrame)) {
+      throw new Error('Unauthorized renderer requested clipboard access');
+    }
+    if (typeof rawText !== 'string') {
+      throw new Error('Invalid clipboard text');
+    }
+    clipboard.writeText(rawText);
+    return true;
+  });
 
   ipcMain.handle(NOTIFY_PARTICIPANT_CHANNEL, (event, rawDisplayName: unknown): boolean => {
     if (!isAuthorizedSender(event.sender, event.senderFrame)) {

@@ -146,6 +146,7 @@ export default function RoomPage({
   const isRoomConnected = signalingStatus === 'connected' && (
     room.participants.length <= 1 || rtcConnectedCount > 0
   );
+  
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 15_000);
@@ -157,28 +158,42 @@ export default function RoomPage({
     };
   }, []);
 
-  async function handleCopyCode() {
-    let duration = 2_000;
-    try {
+async function handleCopyCode() {
+  let duration = 2_000;
+  try {
+    if (window.topCast?.copyToClipboard) {
+      await window.topCast.copyToClipboard(room.inviteCode);
+    } else if (navigator?.clipboard?.writeText) {
       await navigator.clipboard.writeText(room.inviteCode);
-      setIsCopied(true);
-      setToastTone('success');
-      setToastMessage('Código copiado para a área de transferência!');
-    } catch (error) {
-      duration = 4_500;
-      setIsCopied(false);
-      setToastTone('error');
-      const message = error instanceof Error
-        ? `Não foi possível copiar o código: ${error.message}`
-        : 'Não foi possível copiar o código.';
-      setToastMessage(message);
+    } else {
+      const textArea = document.createElement('textarea');
+      textArea.value = room.inviteCode;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      if (!success) throw new Error('Falha ao copiar');
     }
-    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = window.setTimeout(() => {
-      setToastMessage('');
-      setIsCopied(false);
-    }, duration);
+
+    setIsCopied(true);
+    setToastTone('success');
+    setToastMessage('Código copiado para a área de transferência!');
+  } catch (error) {
+    duration = 4_500;
+    setIsCopied(false);
+    setToastTone('error');
+    setToastMessage('Não foi possível copiar o código.');
   }
+
+  if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+  toastTimerRef.current = window.setTimeout(() => {
+    setToastMessage('');
+    setIsCopied(false);
+  }, duration);
+}
 
   function handlePresenceChange(value: string) {
     if (value !== 'available' && value !== 'away' && value !== 'busy') {

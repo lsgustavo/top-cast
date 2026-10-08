@@ -3,6 +3,8 @@ import { APP_NAME } from '../shared/constants/app.js';
 import type { TopCastApi } from '../shared/types/desktop-api.js';
 
 const api: TopCastApi = {
+    copyToClipboard: (text: string) =>
+    ipcRenderer.invoke('app:copy-to-clipboard', text),
   getAppInfo: () => ({
     name: APP_NAME,
     version: app.getVersion(),

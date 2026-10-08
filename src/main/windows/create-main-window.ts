@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, session } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APP_NAME } from '../../shared/constants/app.js';
@@ -9,12 +9,24 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export function createMainWindow(): BrowserWindow {
- 
   Menu.setApplicationMenu(null);
 
-  // const iconPath = app.isPackaged
-  //   ? path.join(app.getAppPath(), 'dist/icon.ico')
-  //   : path.join(__dirname, '../../../public/icon.ico');
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    const allowedPermissions = [
+      'display-capture',
+      'media',
+      'clipboard-read',
+      'clipboard-write',
+      'clipboard-sanitized-write',
+    ];
+
+    if (allowedPermissions.includes(permission)) {
+      callback(true);
+      return;
+    }
+
+    callback(false);
+  });
 
   const mainWindow = new BrowserWindow({
     width: 1280,
@@ -24,7 +36,6 @@ export function createMainWindow(): BrowserWindow {
     backgroundColor: '#10131a',
     title: APP_NAME,
     autoHideMenuBar: true,
-    // icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, '../../preload/preload.js'),
       contextIsolation: true,
