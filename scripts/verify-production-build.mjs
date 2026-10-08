@@ -20,6 +20,10 @@ for (const relativePath of requiredFiles) {
 }
 
 const html = await readFile(path.join(projectRoot, 'dist/index.html'), 'utf8');
+if (/(?:src|href)="\/assets\//.test(html)) {
+  throw new Error('Production renderer assets must use relative paths to load from Electron file:// URLs.');
+}
+
 const assets = [...html.matchAll(/(?:src|href)="\.?\/?(assets\/[^"]+)"/g)]
   .map((match) => match[1]);
 if (!assets.some((asset) => asset.endsWith('.js')) || !assets.some((asset) => asset.endsWith('.css'))) {

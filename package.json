@@ -5,15 +5,15 @@
   "main": "dist-electron/main/main.js",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:server\" \"npm:dev:electron\"",
-    "dev:renderer": "vite --host --strictPort --port 4173",
+    "dev:renderer": "vite --config vite.config.ts --host --strictPort --port 4173",
     "dev:server": "tsx watch src/server/index.ts",
     "dev:electron": "tsc -p tsconfig.node.json && wait-on tcp:4173 tcp:3001 && electron dist-electron/main/main.js",
-    "build": "tsc -p tsconfig.node.json && tsc -p tsconfig.server.json && tsc -p tsconfig.app.json && vite build",
+    "build": "tsc -p tsconfig.node.json && tsc -p tsconfig.server.json && tsc -p tsconfig.app.json && vite build --config vite.config.ts",
     "build:windows": "npm run build && node scripts/verify-production-build.mjs",
     "build:installer": "node scripts/verify-installer-config.mjs && npm run build:windows && electron-builder --win nsis --x64",
     "verify:production": "node scripts/verify-production-build.mjs",
     "test:signaling-smoke": "node scripts/smoke-test-signaling.mjs",
-    "preview": "vite preview --host",
+    "preview": "vite preview --config vite.config.ts --host",
     "test": "tsx --test src/server/services/room-service.test.ts src/server/services/signaling-validation.test.ts src/server/services/ice-credentials.test.ts tests/ice-configuration.test.ts tests/reconnect-identity.test.ts tests/room-ui.test.ts tests/participant-events.test.ts"
   },
   "keywords": [
