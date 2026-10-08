@@ -17,7 +17,7 @@ export function createMainWindow(): BrowserWindow {
     backgroundColor: '#10131a',
     title: APP_NAME,
     webPreferences: {
-      preload: path.join(__dirname, '../../preload/preload.js'),
+      preload: path.join(__dirname, '../../preload/preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },

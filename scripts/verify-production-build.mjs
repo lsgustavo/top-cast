@@ -6,7 +6,7 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const requiredFiles = [
   'dist/index.html',
   'dist-electron/main/main.js',
-  'dist-electron/preload/preload.js',
+  'dist-electron/preload/preload.mjs',
   'dist-server/server/index.js',
 ];
 
