@@ -10,13 +10,14 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
+import { SettingsDialog } from '../components/settings-dialog';
 import { APP_NAME } from '../../shared/constants/app';
 
 const DEFAULT_SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL ?? 'http://127.0.0.1:3001';
 
 const appInfo = window.topCast?.getAppInfo() ?? {
   name: APP_NAME,
-  version: '0.1.0',
+  version: '0.1.0 (TELEBOGAS)',
   electron: 'n/a',
   chrome: 'n/a',
 };
@@ -53,14 +54,14 @@ function AnimatedWaveBackground() {
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 overflow-hidden select-none"
     >
-      {/* 1. Brilho ambiente superior com pulso suave */}
-      <div className="animate-glow-pulse absolute -top-36 left-1/2 h-[520px] w-[880px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.18)_0%,rgba(37,99,235,0.06)_45%,transparent_70%)] blur-2xl" />
+      {/* 1. Iluminação Ambiente Tri-Tonal (Muted Purple, Primary Cobalt, Soft Mint) */}
+      <div className="absolute -top-32 -left-20 h-[480px] w-[640px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.08)_0%,transparent_65%)] blur-3xl" />
+      <div className="animate-glow-pulse absolute -top-36 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.16)_0%,hsl(var(--primary-600)/0.05)_45%,transparent_70%)] blur-2xl" />
+      <div className="absolute top-1/4 -right-24 h-[440px] w-[580px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(45,212,191,0.06)_0%,transparent_65%)] blur-3xl" />
+      <div className="absolute -bottom-24 left-1/2 h-[450px] w-[1000px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,hsl(var(--primary-700)/0.07)_0%,transparent_65%)] blur-3xl" />
 
-      {/* 2. Brilho ambiente inferior suave */}
-      <div className="absolute -bottom-24 left-1/2 h-[450px] w-[1000px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(37,99,235,0.08)_0%,transparent_65%)] blur-3xl" />
-
-      {/* 3. Onda 1 (Profundidade / Fundo - movimento contínuo calmo) */}
-      <div className="absolute bottom-0 left-0 h-64 sm:h-80 lg:h-96 w-full opacity-80 overflow-hidden">
+      {/* 2. Onda 1 (Profundidade & Camada de Fundo - Swell contínuo fluido) */}
+      <div className="absolute bottom-0 left-0 h-64 sm:h-80 lg:h-96 w-full overflow-hidden opacity-80">
         <svg
           viewBox="0 0 2400 320"
           preserveAspectRatio="none"
@@ -68,23 +69,24 @@ function AnimatedWaveBackground() {
         >
           <defs>
             <linearGradient id="tc-wave-grad-1" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.14" />
-              <stop offset="45%" stopColor="#1d4ed8" stopOpacity="0.06" />
-              <stop offset="100%" stopColor="#0b1020" stopOpacity="0.0" />
+              <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.14" />
+              <stop offset="45%" stopColor="hsl(var(--primary-700))" stopOpacity="0.08" />
+              <stop offset="85%" stopColor="#1e1b4b" stopOpacity="0.03" />
+              <stop offset="100%" stopColor="hsl(var(--background))" stopOpacity="0.0" />
             </linearGradient>
           </defs>
           <path
-            d="M0,140 C320,70 520,210 800,130 C1040,60 1140,180 1200,140 C1520,70 1720,210 2000,130 C2240,60 2340,180 2400,140 L2400,320 L0,320 Z"
+            d="M0,140 C100,123 200,85 300,85 C400,85 500,123 600,140 C700,157 800,185 900,185 C1000,185 1100,157 1200,140 C1300,123 1400,85 1500,85 C1600,85 1700,123 1800,140 C1900,157 2000,185 2100,185 C2200,185 2300,157 2400,140 L2400,320 L0,320 Z"
             fill="url(#tc-wave-grad-1)"
-            stroke="#60a5fa"
+            stroke="#a78bfa"
             strokeWidth="1.2"
-            strokeOpacity="0.22"
+            strokeOpacity="0.24"
           />
         </svg>
       </div>
 
-      {/* 4. Onda 2 (Camada intermediária - contra-fluxo suave) */}
-      <div className="absolute bottom-0 left-0 h-56 sm:h-72 lg:h-88 w-full opacity-75 overflow-hidden">
+      {/* 3. Onda 2 (Camada Intermediária - Contra-fluxo suave com Muted Purple e Cobalt) */}
+      <div className="absolute bottom-0 left-0 h-56 sm:h-72 lg:h-88 w-full overflow-hidden opacity-75">
         <svg
           viewBox="0 0 2400 320"
           preserveAspectRatio="none"
@@ -92,23 +94,24 @@ function AnimatedWaveBackground() {
         >
           <defs>
             <linearGradient id="tc-wave-grad-2" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.11" />
-              <stop offset="50%" stopColor="#2563eb" stopOpacity="0.04" />
-              <stop offset="100%" stopColor="#0b1020" stopOpacity="0.0" />
+              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.13" />
+              <stop offset="35%" stopColor="hsl(var(--primary-500))" stopOpacity="0.09" />
+              <stop offset="75%" stopColor="#0f172a" stopOpacity="0.03" />
+              <stop offset="100%" stopColor="hsl(var(--background))" stopOpacity="0.0" />
             </linearGradient>
           </defs>
           <path
-            d="M0,180 C240,240 460,110 720,170 C960,220 1100,130 1200,180 C1440,240 1660,110 1920,170 C2160,220 2300,130 2400,180 L2400,320 L0,320 Z"
+            d="M0,175 C93,158 213,119 320,120 C427,121 533,163 640,180 C747,197 867,221 960,220 C1053,219 1107,192 1200,175 C1293,158 1413,119 1520,120 C1627,121 1733,163 1840,180 C1947,197 2067,221 2160,220 C2253,219 2307,192 2400,175 L2400,320 L0,320 Z"
             fill="url(#tc-wave-grad-2)"
-            stroke="#93c5fd"
-            strokeWidth="1"
-            strokeOpacity="0.28"
+            stroke="hsl(var(--primary-300))"
+            strokeWidth="1.1"
+            strokeOpacity="0.26"
           />
         </svg>
       </div>
 
-      {/* 5. Onda 3 (Primeiro plano - fluxo orgânico sutil) */}
-      <div className="absolute bottom-0 left-0 h-48 sm:h-64 lg:h-76 w-full opacity-90 overflow-hidden">
+      {/* 4. Onda 3 (Primeiro Plano - Fluxo orgânico com toque de Menta Luminosa) */}
+      <div className="absolute bottom-0 left-0 h-48 sm:h-64 lg:h-76 w-full overflow-hidden opacity-90">
         <svg
           viewBox="0 0 2400 320"
           preserveAspectRatio="none"
@@ -116,25 +119,26 @@ function AnimatedWaveBackground() {
         >
           <defs>
             <linearGradient id="tc-wave-grad-3" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.18" />
-              <stop offset="40%" stopColor="#1e40af" stopOpacity="0.07" />
-              <stop offset="100%" stopColor="#0b1020" stopOpacity="0.35" />
+              <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.18" />
+              <stop offset="25%" stopColor="hsl(var(--primary))" stopOpacity="0.12" />
+              <stop offset="65%" stopColor="#8b5cf6" stopOpacity="0.05" />
+              <stop offset="100%" stopColor="hsl(var(--background))" stopOpacity="0.35" />
             </linearGradient>
           </defs>
           <path
-            d="M0,210 C180,160 380,240 640,195 C900,150 1060,230 1200,210 C1380,160 1580,240 1840,195 C2100,150 2260,230 2400,210 L2400,320 L0,320 Z"
+            d="M0,210 C67,199 158,164 250,165 C342,166 450,213 550,215 C650,217 767,173 850,175 C933,178 992,224 1050,230 C1108,236 1133,221 1200,210 C1267,199 1358,164 1450,165 C1542,166 1650,213 1750,215 C1850,217 1967,173 2050,175 C2133,178 2192,224 2250,230 C2308,236 2333,221 2400,210 L2400,320 L0,320 Z"
             fill="url(#tc-wave-grad-3)"
-            stroke="#bfdbfe"
+            stroke="#5eead4"
             strokeWidth="1.2"
-            strokeOpacity="0.35"
+            strokeOpacity="0.38"
           />
         </svg>
       </div>
 
-      {/* 6. Overlays de contraste & proteção visual do conteúdo */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,transparent_30%,#0b1020_92%)]" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0b1020] via-transparent to-[#0b1020]/75" />
-      <div className="absolute inset-0 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.035]" />
+      {/* 5. Overlays de contraste & proteção visual do conteúdo da Home */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,transparent_30%,hsl(var(--background))_92%)]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/75" />
+      <div className="absolute inset-0 bg-[radial-gradient(hsl(var(--primary))_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.035]" />
     </div>
   );
 }
@@ -225,6 +229,10 @@ export default function HomePage({
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1020] px-5 py-10 text-slate-50 sm:px-8">
       <AnimatedWaveBackground />
+
+      <div className="absolute right-4 top-4 z-20 [-webkit-app-region:no-drag] sm:right-6 sm:top-6">
+        <SettingsDialog />
+      </div>
 
       <div className="relative z-10 w-full max-w-[520px]">
         <header className="mb-12 flex items-center justify-center gap-3 [-webkit-app-region:drag]">
@@ -484,7 +492,7 @@ export default function HomePage({
         <footer className="mt-8 flex items-center justify-center gap-2 text-xs text-slate-500">
           <span>{appInfo.name}</span>
           <span aria-hidden="true">·</span>
-          <span>Versão {appInfo.version}</span>
+          <span>Versão Beta {appInfo.version}</span>
         </footer>
       </div>
     </main>

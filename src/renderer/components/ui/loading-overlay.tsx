@@ -27,10 +27,10 @@ export function LoadingOverlay({
           <div className="absolute h-full w-full animate-ping rounded-full bg-blue-500/20" />
           
           {/* Anel giratório externo */}
-          <div className="h-14 w-14 animate-spin rounded-full border-[2.5px] border-slate-800 border-t-blue-500 border-r-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]" />
+          <div className="h-14 w-14 animate-spin rounded-full border-[2.5px] border-slate-800 border-t-blue-500 border-r-blue-400 shadow-[0_0_15px_hsl(var(--primary)/0.3)]" />
           
           {/* Ponto brilhante central */}
-          <div className="absolute h-3 w-3 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
+          <div className="absolute h-3 w-3 rounded-full bg-blue-400 shadow-[0_0_8px_hsl(var(--primary-400)/0.8)]" />
         </div>
 
         <div className="text-center">

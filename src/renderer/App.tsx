@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import CreateRoomPage from './pages/CreateRoomPage';
 import HomePage from './pages/HomePage';
 import JoinRoomPage from './pages/JoinRoomPage';
@@ -13,6 +13,7 @@ import { getParticipantChanges } from './lib/participant-events';
 import { playPresenceSound } from './lib/presence-sound';
 import { TooltipProvider } from './components/ui/tooltip';
 import { LoadingOverlay } from './components/ui/loading-overlay';
+import { WelcomeDialog, isWelcomeDismissed } from './components/welcome-dialog';
 
 const SIGNALING_URL_STORAGE_KEY = 'topcast:signaling-url';
 const DISPLAY_NAME_STORAGE_KEY = 'topcast:display-name';
@@ -40,6 +41,8 @@ export default function App() {
   const hadSocketConnectionRef = useRef(false);
   const reconnectIdentityRef = useRef<ReconnectIdentity | null>(null);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const handleOpenWelcome = useCallback(() => setShowWelcome(true), []);
   roomRef.current = room;
 
   function applySignalingServer(url: string) {
@@ -258,6 +261,9 @@ export default function App() {
           setHomeNotice('');
           setRoom(createdRoom);
           setPage('room');
+          if (!isWelcomeDismissed()) {
+            setShowWelcome(true);
+          }
         }}
       />
     );
@@ -314,6 +320,7 @@ export default function App() {
           setRoom(null);
           setPage('home');
         }}
+        onOpenWelcome={handleOpenWelcome}
       />
     );
   } else {
@@ -340,6 +347,7 @@ export default function App() {
   return (
     <TooltipProvider delayDuration={200}>
       {pageContent}
+      <WelcomeDialog open={showWelcome} onOpenChange={setShowWelcome} />
       {signalingStatus === 'restoring' && (
         <LoadingOverlay
           title="Restaurando sessão…"

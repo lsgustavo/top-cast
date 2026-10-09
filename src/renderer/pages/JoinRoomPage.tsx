@@ -79,7 +79,7 @@ export default function JoinRoomPage({ socket, displayName, onBack, onRoomJoined
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1020] px-5 py-8 text-slate-50 sm:px-8">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.1),transparent_48%)]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,hsl(var(--primary)/0.1),transparent_48%)]" />
 
       <div className="relative w-full max-w-[480px]">
         <header className="mb-10 flex items-center justify-between">
