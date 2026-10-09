@@ -406,7 +406,7 @@ async function handleCopyCode() {
   }
 
   return (
-    <main className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0b1020] text-slate-50 lg:h-screen lg:flex-row lg:overflow-hidden">
+    <main className="relative flex h-full min-h-full flex-col overflow-x-hidden bg-[#0b1020] text-slate-50 lg:h-full lg:flex-row lg:overflow-hidden">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,hsl(var(--primary)/0.1),transparent_48%)]" />
 
       <aside
@@ -733,7 +733,7 @@ async function handleCopyCode() {
         </Tooltip>
       </aside>
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-1rem)] w-full max-w-[1600px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5">
+      <div className="relative mx-auto flex min-h-full w-full max-w-[1600px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5">
         <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-800/80 pb-4 [-webkit-app-region:drag]">
           <div>
             <h2 className="text-base font-semibold">Sala de transmissão</h2>

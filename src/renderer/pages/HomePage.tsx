@@ -227,7 +227,7 @@ export default function HomePage({
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1020] px-5 py-10 text-slate-50 sm:px-8">
+    <main className="relative flex h-full min-h-full items-center justify-center overflow-x-hidden bg-[#0b1020] px-5 py-6 text-slate-50 sm:px-8 sm:py-8">
       <AnimatedWaveBackground />
 
       <div className="absolute right-4 top-4 z-20 [-webkit-app-region:no-drag] sm:right-6 sm:top-6">

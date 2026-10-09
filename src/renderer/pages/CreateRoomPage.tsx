@@ -42,7 +42,7 @@ export default function CreateRoomPage({ socket, displayName, onBack, onRoomCrea
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1020] px-5 py-8 text-slate-50 sm:px-8">
+    <main className="relative flex h-full min-h-full items-center justify-center overflow-x-hidden bg-[#0b1020] px-5 py-6 text-slate-50 sm:px-8 sm:py-8">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,hsl(var(--primary)/0.1),transparent_48%)]" />
 
       <section className="relative w-full max-w-lg rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-2xl shadow-black/20 sm:p-8">
