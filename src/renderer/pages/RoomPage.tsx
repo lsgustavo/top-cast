@@ -21,6 +21,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip';
 import { SettingsDialog } from '../components/settings-dialog';
+import { SourceThumbnail } from '../components/source-thumbnail';
 import {
   Dialog,
   DialogContent,
@@ -1014,17 +1015,7 @@ async function handleCopyCode() {
                       }`}
                     >
                       <div className="relative aspect-video w-full overflow-hidden bg-slate-950 border-b border-slate-800/80">
-                        {source.thumbnailDataUrl ? (
-                          <img
-                            src={source.thumbnailDataUrl}
-                            alt={source.name}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-slate-900 text-slate-600">
-                            {sourceKind === 'screen' ? <Monitor className="h-10 w-10" /> : <AppWindow className="h-10 w-10" />}
-                          </div>
-                        )}
+                        <SourceThumbnail source={source} sourceKind={sourceKind} />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
 
                         {isSelected && (

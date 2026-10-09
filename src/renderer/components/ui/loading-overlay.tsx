@@ -21,22 +21,37 @@ export function LoadingOverlay({
         className,
       )}
     >
-      <div className="relative flex flex-col items-center gap-4 rounded-2xl border border-slate-800/90 bg-slate-900/90 px-8 py-7 shadow-2xl shadow-black/60 backdrop-blur-xl">
-        <div className="relative flex h-14 w-14 items-center justify-center">
-          {/* Pulso de fundo */}
-          <div className="absolute h-full w-full animate-ping rounded-full bg-blue-500/20" />
-          
-          {/* Anel giratório externo */}
-          <div className="h-14 w-14 animate-spin rounded-full border-[2.5px] border-slate-800 border-t-blue-500 border-r-blue-400 shadow-[0_0_15px_hsl(var(--primary)/0.3)]" />
-          
-          {/* Ponto brilhante central */}
-          <div className="absolute h-3 w-3 rounded-full bg-blue-400 shadow-[0_0_8px_hsl(var(--primary-400)/0.8)]" />
+      <div className="relative flex min-w-56 flex-col items-center gap-3.5 rounded-2xl border border-slate-800/80 bg-slate-900/95 px-7 py-6 shadow-2xl shadow-black/70 backdrop-blur-xl">
+        {/* Spinner simples, discreto e profissional */}
+        <div className="flex h-10 w-10 items-center justify-center text-primary">
+          <svg
+            className="h-8 w-8 animate-spin"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="9.5"
+              stroke="currentColor"
+              strokeWidth="2.25"
+              strokeLinecap="round"
+              className="opacity-15"
+            />
+            <path
+              d="M12 2.5a9.5 9.5 0 0 1 9.5 9.5"
+              stroke="currentColor"
+              strokeWidth="2.25"
+              strokeLinecap="round"
+            />
+          </svg>
         </div>
 
         <div className="text-center">
-          <p className="text-sm font-semibold tracking-tight text-slate-100">{title}</p>
+          <p className="text-sm font-medium tracking-tight text-slate-100">{title}</p>
           {description && (
-            <p className="mt-1 text-xs text-slate-400">{description}</p>
+            <p className="mt-1 max-w-xs text-xs text-slate-400 leading-normal">{description}</p>
           )}
         </div>
       </div>
