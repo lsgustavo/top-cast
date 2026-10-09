@@ -1,7 +1,18 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import {
+  Check,
+  CircleAlert,
+  Copy,
+  Globe,
+  Radio,
+  RotateCcw,
+  Server,
+} from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { APP_NAME } from '../../shared/constants/app';
+
+const DEFAULT_SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL ?? 'http://127.0.0.1:3001';
 
 const appInfo = window.topCast?.getAppInfo() ?? {
   name: APP_NAME,
@@ -36,6 +47,98 @@ function ActionIcon({ action }: { action: 'create' | 'join' }) {
   );
 }
 
+function AnimatedWaveBackground() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden select-none"
+    >
+      {/* 1. Brilho ambiente superior com pulso suave */}
+      <div className="animate-glow-pulse absolute -top-36 left-1/2 h-[520px] w-[880px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.18)_0%,rgba(37,99,235,0.06)_45%,transparent_70%)] blur-2xl" />
+
+      {/* 2. Brilho ambiente inferior suave */}
+      <div className="absolute -bottom-24 left-1/2 h-[450px] w-[1000px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(37,99,235,0.08)_0%,transparent_65%)] blur-3xl" />
+
+      {/* 3. Onda 1 (Profundidade / Fundo - movimento contínuo calmo) */}
+      <div className="absolute bottom-0 left-0 h-64 sm:h-80 lg:h-96 w-full opacity-80 overflow-hidden">
+        <svg
+          viewBox="0 0 2400 320"
+          preserveAspectRatio="none"
+          className="animate-wave-1 absolute bottom-0 left-0 h-full w-[200%]"
+        >
+          <defs>
+            <linearGradient id="tc-wave-grad-1" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.14" />
+              <stop offset="45%" stopColor="#1d4ed8" stopOpacity="0.06" />
+              <stop offset="100%" stopColor="#0b1020" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M0,140 C320,70 520,210 800,130 C1040,60 1140,180 1200,140 C1520,70 1720,210 2000,130 C2240,60 2340,180 2400,140 L2400,320 L0,320 Z"
+            fill="url(#tc-wave-grad-1)"
+            stroke="#60a5fa"
+            strokeWidth="1.2"
+            strokeOpacity="0.22"
+          />
+        </svg>
+      </div>
+
+      {/* 4. Onda 2 (Camada intermediária - contra-fluxo suave) */}
+      <div className="absolute bottom-0 left-0 h-56 sm:h-72 lg:h-88 w-full opacity-75 overflow-hidden">
+        <svg
+          viewBox="0 0 2400 320"
+          preserveAspectRatio="none"
+          className="animate-wave-2 absolute bottom-0 left-0 h-full w-[200%]"
+        >
+          <defs>
+            <linearGradient id="tc-wave-grad-2" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.11" />
+              <stop offset="50%" stopColor="#2563eb" stopOpacity="0.04" />
+              <stop offset="100%" stopColor="#0b1020" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M0,180 C240,240 460,110 720,170 C960,220 1100,130 1200,180 C1440,240 1660,110 1920,170 C2160,220 2300,130 2400,180 L2400,320 L0,320 Z"
+            fill="url(#tc-wave-grad-2)"
+            stroke="#93c5fd"
+            strokeWidth="1"
+            strokeOpacity="0.28"
+          />
+        </svg>
+      </div>
+
+      {/* 5. Onda 3 (Primeiro plano - fluxo orgânico sutil) */}
+      <div className="absolute bottom-0 left-0 h-48 sm:h-64 lg:h-76 w-full opacity-90 overflow-hidden">
+        <svg
+          viewBox="0 0 2400 320"
+          preserveAspectRatio="none"
+          className="animate-wave-3 absolute bottom-0 left-0 h-full w-[200%]"
+        >
+          <defs>
+            <linearGradient id="tc-wave-grad-3" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.18" />
+              <stop offset="40%" stopColor="#1e40af" stopOpacity="0.07" />
+              <stop offset="100%" stopColor="#0b1020" stopOpacity="0.35" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M0,210 C180,160 380,240 640,195 C900,150 1060,230 1200,210 C1380,160 1580,240 1840,195 C2100,150 2260,230 2400,210 L2400,320 L0,320 Z"
+            fill="url(#tc-wave-grad-3)"
+            stroke="#bfdbfe"
+            strokeWidth="1.2"
+            strokeOpacity="0.35"
+          />
+        </svg>
+      </div>
+
+      {/* 6. Overlays de contraste & proteção visual do conteúdo */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,transparent_30%,#0b1020_92%)]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0b1020] via-transparent to-[#0b1020]/75" />
+      <div className="absolute inset-0 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.035]" />
+    </div>
+  );
+}
+
 interface HomePageProps {
   notice: string;
   signalingServerUrl: string;
@@ -59,24 +162,58 @@ export default function HomePage({
 }: HomePageProps) {
   const [serverInput, setServerInput] = useState(signalingServerUrl);
   const [serverError, setServerError] = useState('');
+  const [isCopiedServerUrl, setIsCopiedServerUrl] = useState(false);
+
+  const isConnected = roomIsActive !== null;
+  const isCustomUrl = signalingServerUrl !== DEFAULT_SIGNALING_URL;
+  const isCurrentUrl = serverInput.trim() === signalingServerUrl;
 
   useEffect(() => setServerInput(signalingServerUrl), [signalingServerUrl]);
 
+  async function handleCopyServerUrl() {
+    try {
+      if (window.topCast?.copyToClipboard) {
+        await window.topCast.copyToClipboard(signalingServerUrl);
+      } else if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(signalingServerUrl);
+      }
+      setIsCopiedServerUrl(true);
+      window.setTimeout(() => setIsCopiedServerUrl(false), 2000);
+    } catch {
+      // ignore
+    }
+  }
+
+  function handleRestoreDefault() {
+    setServerInput(DEFAULT_SIGNALING_URL);
+    setServerError('');
+    onApplySignalingServer(DEFAULT_SIGNALING_URL);
+  }
+
   function handleServerSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    let trimmed = serverInput.trim();
+    if (!trimmed) {
+      setServerError('Informe um endereço de servidor.');
+      return;
+    }
+    if (!/^https?:\/\//i.test(trimmed)) {
+      trimmed = `http://${trimmed}`;
+    }
     try {
-      const url = new URL(serverInput.trim());
+      const url = new URL(trimmed);
       if (
         !['http:', 'https:'].includes(url.protocol) ||
         url.username ||
         url.password ||
-        url.pathname !== '/' ||
+        (url.pathname !== '/' && url.pathname !== '') ||
         url.search ||
         url.hash
       ) {
-        throw new Error('Informe um endereço HTTP(S) com host e porta, sem caminho adicional.');
+        throw new Error('Informe um endereço HTTP(S) com host e porta (ex: http://192.168.1.20:3001).');
       }
       setServerError('');
+      setServerInput(url.origin);
       onApplySignalingServer(url.origin);
     } catch (error) {
       setServerError(error instanceof Error
@@ -87,9 +224,9 @@ export default function HomePage({
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1020] px-5 py-10 text-slate-50 sm:px-8">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(59,130,246,0.13),transparent_48%)]" />
+      <AnimatedWaveBackground />
 
-      <div className="relative w-full max-w-[520px]">
+      <div className="relative z-10 w-full max-w-[520px]">
         <header className="mb-12 flex items-center justify-center gap-3 [-webkit-app-region:drag]">
           <div className="grid h-11 w-11 place-items-center rounded-2xl border border-blue-400/20 bg-blue-500/10 text-blue-300">
             <ScreenIcon />
@@ -183,34 +320,160 @@ export default function HomePage({
           </Button>
         </section>
 
-        <form
-          aria-label="Servidor de salas"
-          onSubmit={handleServerSubmit}
-          className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
+        {/* Seção Servidor de Salas */}
+        <section
+          aria-labelledby="server-section-title"
+          className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5 shadow-lg shadow-black/20 backdrop-blur-sm"
         >
-          <label htmlFor="signaling-server" className="block text-xs font-medium text-slate-300">
-            Endereço do servidor de salas
-          </label>
-          <div className="mt-2 flex gap-2">
-            <input
-              id="signaling-server"
-              type="url"
-              required
-              value={serverInput}
-              onChange={(event) => setServerInput(event.currentTarget.value)}
-              placeholder="http://192.168.1.20:3001"
-              autoComplete="url"
-              className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-blue-400"
-            />
-            <Button type="submit" variant="secondary" size="sm">Aplicar</Button>
+          {/* Header com ícone, título e status online/conectando */}
+          <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-3.5">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${
+                isConnected
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                  : 'border-amber-500/30 bg-amber-500/10 text-amber-300 animate-pulse'
+              }`}>
+                <Server className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <h2 id="server-section-title" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                  Servidor de Salas
+                </h2>
+                <p className="truncate text-xs text-slate-400">
+                  {isConnected ? 'Sinalização pronta para conexões' : 'Tentando estabelecer conexão…'}
+                </p>
+              </div>
+            </div>
+
+            {/* Badge de status */}
+            <div className="flex shrink-0 items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tracking-wide ${
+                isConnected
+                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+                  : 'border-amber-500/30 bg-amber-500/15 text-amber-300'
+              }`}>
+                <span className="relative flex h-1.5 w-1.5">
+                  {isConnected ? (
+                    <>
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400" />
+                    </>
+                  )}
+                </span>
+                {isConnected ? 'Online' : 'Conectando'}
+              </span>
+            </div>
           </div>
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            Para uma rede local, use o endereço IP do computador que executa o servidor.
-          </p>
-          {serverError && (
-            <p role="alert" className="mt-2 text-xs text-red-200">{serverError}</p>
-          )}
-        </form>
+
+          {/* Formulário com Input estilizado */}
+          <form onSubmit={handleServerSubmit} className="mt-3.5">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="relative min-w-0 flex-1">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                  <Globe className="h-4 w-4" />
+                </div>
+                <input
+                  id="signaling-server"
+                  type="text"
+                  required
+                  value={serverInput}
+                  onChange={(event) => {
+                    setServerInput(event.currentTarget.value);
+                    if (serverError) setServerError('');
+                  }}
+                  placeholder="http://127.0.0.1:3001 ou http://192.168.1.x:3001"
+                  autoComplete="url"
+                  className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-950/80 pl-9 pr-10 font-mono text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 sm:text-sm"
+                />
+
+                {/* Botão de copiar endereço ativo dentro do input */}
+                <div className="absolute inset-y-0 right-1 flex items-center">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={handleCopyServerUrl}
+                        className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
+                        aria-label="Copiar endereço do servidor"
+                      >
+                        {isCopiedServerUrl ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {isCopiedServerUrl ? 'Endereço copiado!' : 'Copiar endereço'}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+
+              {/* Botão de ação Aplicar / Conectar */}
+              <Button
+                type="submit"
+                disabled={isCurrentUrl && !serverError}
+                className={`h-10 shrink-0 gap-1.5 px-4 font-medium transition-all ${
+                  isCurrentUrl && !serverError
+                    ? 'border border-slate-800 bg-slate-800/50 text-slate-400'
+                    : 'bg-blue-600 text-white hover:bg-blue-500 shadow-md shadow-blue-500/20'
+                }`}
+              >
+                {isCurrentUrl && !serverError ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>Ativo</span>
+                  </>
+                ) : (
+                  <>
+                    <Radio className="h-3.5 w-3.5" />
+                    <span>Conectar</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Mensagem de Erro de validação */}
+            {serverError && (
+              <p role="alert" className="mt-2.5 flex items-start gap-2 rounded-lg border border-red-400/25 bg-red-400/10 px-3 py-2 text-xs leading-5 text-red-200">
+                <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{serverError}</span>
+              </p>
+            )}
+
+            {/* Rodapé com dicas de rede local e atalho para restaurar padrão */}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+              <span className="flex items-center gap-1.5">
+                Para rede local, use o IP deste computador (ex: <code className="rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-[11px] text-slate-300">192.168.1.x:3001</code>).
+              </span>
+
+              {/* Botão de Restaurar Padrão quando o servidor for customizado */}
+              {isCustomUrl && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={handleRestoreDefault}
+                      className="inline-flex items-center gap-1.5 font-medium text-blue-400 hover:text-blue-300 hover:underline text-[11px]"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Restaurar padrão
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Redefinir para o servidor local padrão ({DEFAULT_SIGNALING_URL})
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          </form>
+        </section>
 
         {notice && (
           <p role="status" className="mt-4 rounded-xl border border-amber-300/15 bg-amber-300/[0.05] px-4 py-3 text-center text-sm text-amber-100">

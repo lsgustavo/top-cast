@@ -11,6 +11,7 @@ export interface CaptureSource {
   kind: 'screen' | 'window';
   displayId: string;
   thumbnailDataUrl: string;
+  appIconDataUrl?: string;
 }
 
 export type CaptureSourceSelection =

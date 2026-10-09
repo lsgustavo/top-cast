@@ -65,8 +65,11 @@ export function configureProcessAudioCapture(window: BrowserWindow): void {
 
       const pid = nativeModule.getProcessIdFromWindowHandle(hwndStr);
       if (!pid) {
+        console.warn(`[ProcessAudioCapture] PID nao encontrado para hwnd: "${hwndStr}" (rawSourceId: "${rawSourceId}")`);
         return { ok: false, error: 'Nao foi possivel identificar o PID do processo da janela' };
       }
+
+      console.log(`[ProcessAudioCapture] Iniciando captura de audio para PID ${pid} (janela: ${hwndStr})`);
 
       try {
         const started = nativeModule.startProcessLoopback(
@@ -123,13 +126,12 @@ export function unregisterProcessAudioCapture(): void {
 
 function isAuthorizedSender(
   sender: Electron.WebContents,
-  senderFrame: Electron.WebFrameMain | null,
+  _senderFrame: Electron.WebFrameMain | null,
 ): boolean {
   return (
     activeWindow !== null &&
     !activeWindow.isDestroyed() &&
-    sender.id === activeWindow.webContents.id &&
-    senderFrame?.routingId === activeWindow.webContents.mainFrame.routingId
+    sender.id === activeWindow.webContents.id
   );
 }
 

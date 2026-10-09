@@ -149,8 +149,8 @@ async function refreshSources(): Promise<CaptureSource[]> {
   try {
     const sources = await desktopCapturer.getSources({
       types: ['screen', 'window'],
-      thumbnailSize: { width: 320, height: 180 },
-      fetchWindowIcons: false,
+      thumbnailSize: { width: 500, height: 280 },
+      fetchWindowIcons: true,
     });
 
     availableSources = new Map(sources.map((source) => [source.id, source]));
@@ -162,6 +162,7 @@ async function refreshSources(): Promise<CaptureSource[]> {
       kind: source.id.startsWith('screen:') ? 'screen' : 'window',
       displayId: source.display_id,
       thumbnailDataUrl: source.thumbnail.toDataURL(),
+      appIconDataUrl: source.appIcon ? source.appIcon.toDataURL() : undefined,
     }));
   } catch (error) {
     console.error('[ScreenCapture] Erro ao listar fontes de tela:', error);

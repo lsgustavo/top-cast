@@ -71,12 +71,21 @@ bool ProcessAudioCapture::IsSupported()
 
 DWORD ProcessAudioCapture::GetProcessIdFromWindowHandle(HWND hwnd)
 {
-    if (!hwnd || !IsWindow(hwnd)) {
+    if (!hwnd) {
         return 0;
     }
-    DWORD pid = 0;
-    GetWindowThreadProcessId(hwnd, &pid);
-    return pid;
+    if (IsWindow(hwnd)) {
+        DWORD pid = 0;
+        GetWindowThreadProcessId(hwnd, &pid);
+        if (pid != 0) return pid;
+    }
+    HWND hwnd32 = reinterpret_cast<HWND>(static_cast<uintptr_t>(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(hwnd))));
+    if (IsWindow(hwnd32)) {
+        DWORD pid = 0;
+        GetWindowThreadProcessId(hwnd32, &pid);
+        if (pid != 0) return pid;
+    }
+    return 0;
 }
 
 bool ProcessAudioCapture::Start(DWORD processId, AudioDataCallback callback, std::string& outError)
@@ -199,30 +208,31 @@ void ProcessAudioCapture::CaptureThreadFunc(DWORD processId, AudioDataCallback c
         return;
     }
 
-    // 2. Obter formato de mixagem
-    hr = audioClient->GetMixFormat(&pMixFormat);
-    if (FAILED(hr) || !pMixFormat) {
-        cleanup();
-        return;
-    }
+    // 2. Definir formato de captura padrao (48kHz, 2 canais, Float32)
+    // Nota: IAudioClient::GetMixFormat retorna E_NOTIMPL em VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK
+    WAVEFORMATEXTENSIBLE wfx = {};
+    wfx.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
+    wfx.Format.nChannels = 2;
+    wfx.Format.nSamplesPerSec = 48000;
+    wfx.Format.wBitsPerSample = 32;
+    wfx.Format.nBlockAlign = wfx.Format.nChannels * (wfx.Format.wBitsPerSample / 8);
+    wfx.Format.nAvgBytesPerSec = wfx.Format.nSamplesPerSec * wfx.Format.nBlockAlign;
+    wfx.Format.cbSize = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
+    wfx.Samples.wValidBitsPerSample = 32;
+    wfx.dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
+    wfx.SubFormat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 
-    // 3. Inicializar IAudioClient em modo compartilhado com loopback
+    // 3. Inicializar IAudioClient em modo compartilhado com loopback (timer-driven)
     const REFERENCE_TIME bufferDuration = 10000000; // 1 segundo (em unidades de 100ns)
     hr = audioClient->Initialize(
         AUDCLNT_SHAREMODE_SHARED,
-        AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+        AUDCLNT_STREAMFLAGS_LOOPBACK,
         bufferDuration,
         0,
-        pMixFormat,
+        reinterpret_cast<WAVEFORMATEX*>(&wfx),
         nullptr
     );
 
-    if (FAILED(hr)) {
-        cleanup();
-        return;
-    }
-
-    hr = audioClient->SetEventHandle(hSamplesReady);
     if (FAILED(hr)) {
         cleanup();
         return;
@@ -240,62 +250,49 @@ void ProcessAudioCapture::CaptureThreadFunc(DWORD processId, AudioDataCallback c
         return;
     }
 
-    const uint32_t sampleRate = pMixFormat->nSamplesPerSec;
-    const uint32_t channels = pMixFormat->nChannels;
-    const WORD bitsPerSample = pMixFormat->wBitsPerSample;
-    const bool isFloat = (pMixFormat->wFormatTag == WAVE_FORMAT_IEEE_FLOAT) ||
-        (pMixFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
-         reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pMixFormat)->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT);
+    const uint32_t sampleRate = 48000;
+    const uint32_t channels = 2;
 
-    HANDLE loopWaitHandles[2] = { hSamplesReady, m_hStopEvent };
-
-    // 4. Loop de captura dos pacotes de audio
+    // 4. Loop de captura com polling a cada 10ms (imune a ausência de eventos quando o app está em silêncio)
     while (m_running.load()) {
-        DWORD loopWait = WaitForMultipleObjects(2, loopWaitHandles, FALSE, 200);
-        if (loopWait == (WAIT_OBJECT_0 + 1) || !m_running.load()) {
+        DWORD waitRes = WaitForSingleObject(m_hStopEvent, 10);
+        if (waitRes == WAIT_OBJECT_0 || !m_running.load()) {
             break;
         }
 
-        if (loopWait == WAIT_OBJECT_0) {
-            UINT32 packetLength = 0;
-            hr = captureClient->GetNextPacketSize(&packetLength);
+        UINT32 packetLength = 0;
+        hr = captureClient->GetNextPacketSize(&packetLength);
 
-            while (SUCCEEDED(hr) && packetLength > 0 && m_running.load()) {
-                BYTE* pData = nullptr;
-                UINT32 numFramesRead = 0;
-                DWORD flags = 0;
+        while (SUCCEEDED(hr) && packetLength > 0 && m_running.load()) {
+            BYTE* pData = nullptr;
+            UINT32 numFramesRead = 0;
+            DWORD flags = 0;
 
-                hr = captureClient->GetBuffer(&pData, &numFramesRead, &flags, nullptr, nullptr);
-                if (SUCCEEDED(hr)) {
-                    if (numFramesRead > 0 && pData != nullptr) {
-                        const size_t totalSamples = numFramesRead * channels;
-                        AudioChunk chunk;
-                        chunk.sampleRate = sampleRate;
-                        chunk.channels = channels;
-                        chunk.samples.resize(totalSamples);
+            hr = captureClient->GetBuffer(&pData, &numFramesRead, &flags, nullptr, nullptr);
+            if (SUCCEEDED(hr)) {
+                if (numFramesRead > 0 && pData != nullptr) {
+                    const size_t totalSamples = numFramesRead * channels;
+                    AudioChunk chunk;
+                    chunk.sampleRate = sampleRate;
+                    chunk.channels = channels;
+                    chunk.samples.resize(totalSamples);
 
-                        if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
-                            std::fill(chunk.samples.begin(), chunk.samples.end(), 0.0f);
-                        } else if (isFloat && bitsPerSample == 32) {
-                            const float* floatData = reinterpret_cast<const float*>(pData);
-                            std::copy(floatData, floatData + totalSamples, chunk.samples.begin());
-                        } else if (bitsPerSample == 16) {
-                            const int16_t* intData = reinterpret_cast<const int16_t*>(pData);
-                            for (size_t i = 0; i < totalSamples; ++i) {
-                                chunk.samples[i] = static_cast<float>(intData[i]) / 32768.0f;
-                            }
-                        }
-
-                        if (callback) {
-                            callback(chunk);
-                        }
+                    if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
+                        std::fill(chunk.samples.begin(), chunk.samples.end(), 0.0f);
+                    } else {
+                        const float* floatData = reinterpret_cast<const float*>(pData);
+                        std::copy(floatData, floatData + totalSamples, chunk.samples.begin());
                     }
 
-                    captureClient->ReleaseBuffer(numFramesRead);
+                    if (callback) {
+                        callback(chunk);
+                    }
                 }
 
-                hr = captureClient->GetNextPacketSize(&packetLength);
+                captureClient->ReleaseBuffer(numFramesRead);
             }
+
+            hr = captureClient->GetNextPacketSize(&packetLength);
         }
     }
 

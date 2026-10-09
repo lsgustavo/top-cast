@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../components/ui/button';
+import { LoadingOverlay } from '../components/ui/loading-overlay';
 import { createRoom } from '../lib/room-client';
 import type { RoomSnapshot } from '../../shared/types/signaling';
 import type { SignalingClient } from '../lib/signaling-client';
@@ -96,6 +97,13 @@ export default function CreateRoomPage({ socket, displayName, onBack, onRoomCrea
           {isCreating ? 'Conectando ao servidor e gerando seu convite.' : 'A sala será criada assim que o servidor confirmar.'}
         </p>
       </section>
+
+      {isCreating && (
+        <LoadingOverlay
+          title="Criando sala…"
+          description="Configurando sessão de transmissão e gerando código de convite..."
+        />
+      )}
     </main>
   );
 }

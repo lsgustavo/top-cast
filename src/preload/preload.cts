@@ -1,13 +1,14 @@
-import { app, contextBridge, ipcRenderer } from 'electron';
-import { APP_NAME } from '../shared/constants/app.js';
+import { contextBridge, ipcRenderer } from 'electron';
 import type { ProcessAudioChunk, TopCastApi } from '../shared/types/desktop-api.js';
 
+const APP_NAME = 'TopCast';
+
 const api: TopCastApi = {
-    copyToClipboard: (text: string) =>
+  copyToClipboard: (text: string) =>
     ipcRenderer.invoke('app:copy-to-clipboard', text),
   getAppInfo: () => ({
     name: APP_NAME,
-    version: app.getVersion(),
+    version: process.env.npm_package_version || '0.1.0',
     electron: process.versions.electron,
     chrome: process.versions.chrome,
   }),
@@ -43,3 +44,4 @@ declare global {
     topCast: TopCastApi;
   }
 }
+

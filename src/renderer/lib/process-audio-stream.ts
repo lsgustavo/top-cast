@@ -19,7 +19,18 @@ export function createProcessAudioTrack(sourceId: string): Promise<ProcessAudioS
 
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const audioCtx = new AudioContextClass({ sampleRate: 48000 });
+    if (audioCtx.state === 'suspended') {
+      void audioCtx.resume();
+    }
     const destination = audioCtx.createMediaStreamDestination();
+
+    // Mantem o stream de áudio ativo para o WebRTC transmitir imediatamente
+    const silentGain = audioCtx.createGain();
+    silentGain.gain.value = 0;
+    const silentOsc = audioCtx.createOscillator();
+    silentOsc.connect(silentGain);
+    silentGain.connect(destination);
+    silentOsc.start();
 
     let nextPlayTime = audioCtx.currentTime;
     const activeSources = new Set<AudioBufferSourceNode>();
@@ -81,6 +92,13 @@ export function createProcessAudioTrack(sourceId: string): Promise<ProcessAudioS
       stopped = true;
       removeListener();
       void processAudio.stop();
+      try {
+        silentOsc.stop();
+        silentOsc.disconnect();
+        silentGain.disconnect();
+      } catch {
+        // Ignora se ja finalizado
+      }
       for (const node of activeSources) {
         try {
           node.stop();

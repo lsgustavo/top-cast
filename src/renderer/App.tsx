@@ -11,6 +11,8 @@ import { useScreenCapture } from './features/streaming/use-screen-capture';
 import { getReconnectIdentity, type ReconnectIdentity } from './lib/reconnect-identity';
 import { getParticipantChanges } from './lib/participant-events';
 import { playPresenceSound } from './lib/presence-sound';
+import { TooltipProvider } from './components/ui/tooltip';
+import { LoadingOverlay } from './components/ui/loading-overlay';
 
 const SIGNALING_URL_STORAGE_KEY = 'topcast:signaling-url';
 const DISPLAY_NAME_STORAGE_KEY = 'topcast:display-name';
@@ -243,8 +245,10 @@ export default function App() {
     };
   }, [reconnectAttempt, socket]);
 
+  let pageContent = null;
+
   if (page === 'create-room') {
-    return (
+    pageContent = (
       <CreateRoomPage
         socket={socket}
         displayName={displayName}
@@ -257,10 +261,8 @@ export default function App() {
         }}
       />
     );
-  }
-
-  if (page === 'join-room') {
-    return (
+  } else if (page === 'join-room') {
+    pageContent = (
       <JoinRoomPage
         socket={socket}
         displayName={displayName}
@@ -273,10 +275,8 @@ export default function App() {
         }}
       />
     );
-  }
-
-  if (page === 'room' && room) {
-    return (
+  } else if (page === 'room' && room) {
+    pageContent = (
       <RoomPage
         room={room}
         socket={socket}
@@ -301,6 +301,7 @@ export default function App() {
         captureError={screenCapture.error}
         onLoadSources={screenCapture.loadSources}
         onPrepareSource={screenCapture.prepareSource}
+        onSetIncludeSystemAudio={screenCapture.setIncludeSystemAudio}
         onStartCapture={screenCapture.startCapture}
         onStopCapture={screenCapture.stopCapture}
         onToggleSystemAudio={screenCapture.setSystemAudioEnabled}
@@ -315,24 +316,36 @@ export default function App() {
         }}
       />
     );
+  } else {
+    pageContent = (
+      <HomePage
+        notice={homeNotice}
+        signalingServerUrl={signalingServerUrl}
+        displayName={displayName}
+        roomIsActive={roomAvailability}
+        onDisplayNameChange={updateDisplayName}
+        onApplySignalingServer={applySignalingServer}
+        onCreateRoom={() => {
+          setHomeNotice('');
+          setPage('create-room');
+        }}
+        onJoinRoom={() => {
+          setHomeNotice('');
+          setPage('join-room');
+        }}
+      />
+    );
   }
 
   return (
-    <HomePage
-      notice={homeNotice}
-      signalingServerUrl={signalingServerUrl}
-      displayName={displayName}
-      roomIsActive={roomAvailability}
-      onDisplayNameChange={updateDisplayName}
-      onApplySignalingServer={applySignalingServer}
-      onCreateRoom={() => {
-        setHomeNotice('');
-        setPage('create-room');
-      }}
-      onJoinRoom={() => {
-        setHomeNotice('');
-        setPage('join-room');
-      }}
-    />
+    <TooltipProvider delayDuration={200}>
+      {pageContent}
+      {signalingStatus === 'restoring' && (
+        <LoadingOverlay
+          title="Restaurando sessão…"
+          description="Reconectando à sala de transmissão"
+        />
+      )}
+    </TooltipProvider>
   );
 }

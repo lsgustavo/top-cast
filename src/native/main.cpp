@@ -19,14 +19,19 @@ Napi::Number GetProcessIdFromWindowHandle(const Napi::CallbackInfo& info) {
     HWND hwnd = nullptr;
     if (info[0].IsNumber()) {
         int64_t val = info[0].As<Napi::Number>().Int64Value();
-        hwnd = reinterpret_cast<HWND>(static_cast<intptr_t>(val));
+        hwnd = reinterpret_cast<HWND>(static_cast<uintptr_t>(val));
     } else if (info[0].IsString()) {
         std::string str = info[0].As<Napi::String>().Utf8Value();
         try {
-            int64_t val = std::stoll(str);
-            hwnd = reinterpret_cast<HWND>(static_cast<intptr_t>(val));
+            uint64_t val = std::stoull(str);
+            hwnd = reinterpret_cast<HWND>(static_cast<uintptr_t>(val));
         } catch (...) {
-            hwnd = nullptr;
+            try {
+                int64_t val = std::stoll(str);
+                hwnd = reinterpret_cast<HWND>(static_cast<intptr_t>(val));
+            } catch (...) {
+                hwnd = nullptr;
+            }
         }
     }
 

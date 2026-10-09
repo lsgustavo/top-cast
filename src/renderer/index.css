@@ -40,11 +40,80 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: Inter, 'Segoe UI', sans-serif;
+    font-size: 17px;
     background-image: radial-gradient(circle at top, rgba(59, 130, 246, 0.18), transparent 25%);
     min-height: 100vh;
   }
 
   button {
     font: inherit;
+  }
+}
+
+/* Animações contínuas de ondas e iluminação ambiente (Design Profissional TopCast) */
+@keyframes topcast-wave-1 {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes topcast-wave-2 {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes topcast-wave-3 {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes topcast-glow-pulse {
+  0%, 100% {
+    transform: scale(1) translateY(0);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.05) translateY(-8px);
+    opacity: 0.95;
+  }
+}
+
+.animate-wave-1 {
+  animation: topcast-wave-1 28s linear infinite;
+  will-change: transform;
+}
+
+.animate-wave-2 {
+  animation: topcast-wave-2 20s linear infinite;
+  will-change: transform;
+}
+
+.animate-wave-3 {
+  animation: topcast-wave-3 14s linear infinite;
+  will-change: transform;
+}
+
+.animate-glow-pulse {
+  animation: topcast-glow-pulse 9s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-wave-1,
+  .animate-wave-2,
+  .animate-wave-3,
+  .animate-glow-pulse {
+    animation: none !important;
   }
 }

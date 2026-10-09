@@ -73,15 +73,42 @@ export function useScreenCapture() {
     }
   }, []);
 
+  const setIncludeSystemAudio = useCallback((include: boolean) => {
+    const shouldInclude = include && supportsSystemAudio;
+    setState((current) => ({
+      ...current,
+      includeSystemAudio: shouldInclude,
+    }));
+    if (state.preparedSourceId) {
+      void getScreenCaptureApi()
+        .selectSource(state.preparedSourceId, shouldInclude)
+        .catch((error: unknown) => {
+          console.warn('[ScreenCapture] Falha ao atualizar inclusão de áudio da fonte:', error);
+        });
+    }
+  }, [supportsSystemAudio, state.preparedSourceId]);
+
   const prepareSource = useCallback(async (
     sourceId: string | null,
-    includeSystemAudio = false,
+    includeSystemAudio?: boolean,
   ): Promise<boolean> => {
+    if (sourceId === null) {
+      void getScreenCaptureApi().selectSource(null, false).catch(() => undefined);
+      setState((current) => ({
+        ...current,
+        preparedSourceId: null,
+        isPreparingSource: false,
+        error: null,
+      }));
+      return true;
+    }
+
+    const audioToInclude = (includeSystemAudio !== undefined ? includeSystemAudio : state.includeSystemAudio) && supportsSystemAudio;
     setState((current) => ({ ...current, isPreparingSource: true, error: null }));
     try {
       const selection = await getScreenCaptureApi().selectSource(
         sourceId,
-        includeSystemAudio && supportsSystemAudio,
+        audioToInclude,
       );
       if (!selection.ok) {
         throw new Error(
@@ -94,7 +121,7 @@ export function useScreenCapture() {
       setState((current) => ({
         ...current,
         preparedSourceId: sourceId,
-        includeSystemAudio: includeSystemAudio && supportsSystemAudio,
+        includeSystemAudio: audioToInclude,
         isPreparingSource: false,
         error: null,
       }));
@@ -105,12 +132,11 @@ export function useScreenCapture() {
         ...current,
         isPreparingSource: false,
         preparedSourceId: null,
-        includeSystemAudio: false,
         error: message,
       }));
       return false;
     }
-  }, [supportsSystemAudio]);
+  }, [supportsSystemAudio, state.includeSystemAudio]);
 
   const startCapture = useCallback(async (): Promise<boolean> => {
     if (!state.preparedSourceId) {
@@ -123,6 +149,11 @@ export function useScreenCapture() {
 
     setState((current) => ({ ...current, isStartingCapture: true, error: null }));
     try {
+      await getScreenCaptureApi().selectSource(
+        state.preparedSourceId,
+        state.includeSystemAudio && supportsSystemAudio,
+      );
+
       const isWindow = state.preparedSourceId.startsWith('window:');
 
       // Chamada a getDisplayMedia: para tela cheia captura loopback padrão; para janela, o áudio isolado virá via WASAPI
@@ -201,7 +232,7 @@ export function useScreenCapture() {
       }));
       return false;
     }
-  }, [state.includeSystemAudio, state.preparedSourceId]);
+  }, [state.includeSystemAudio, state.preparedSourceId, supportsSystemAudio]);
 
   const setSystemAudioEnabled = useCallback((enabled: boolean) => {
     const track = streamRef.current?.getAudioTracks()[0];
@@ -233,6 +264,7 @@ export function useScreenCapture() {
     prepareSource,
     startCapture,
     stopCapture,
+    setIncludeSystemAudio,
     setSystemAudioEnabled,
   };
 }

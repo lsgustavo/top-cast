@@ -13,5 +13,5 @@
     "target": "ES2022",
     "strict": true
   },
-  "include": ["src/main/**/*.ts", "src/preload/**/*.mts", "src/shared/**/*.ts"]
+  "include": ["src/main/**/*.ts", "src/preload/**/*.cts", "src/shared/**/*.ts"]
 }

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '../components/ui/button';
+import { LoadingOverlay } from '../components/ui/loading-overlay';
 import { APP_NAME } from '../../shared/constants/app';
 import { joinRoom } from '../lib/room-client';
 import type { RoomSnapshot } from '../../shared/types/signaling';
@@ -171,6 +172,13 @@ export default function JoinRoomPage({ socket, displayName, onBack, onRoomJoined
           A existência, validade e disponibilidade de vagas são verificadas pelo servidor.
         </p>
       </div>
+
+      {submissionState === 'loading' && (
+        <LoadingOverlay
+          title="Entrando na sala…"
+          description="Verificando código de convite e conectando aos participantes..."
+        />
+      )}
     </main>
   );
 }
