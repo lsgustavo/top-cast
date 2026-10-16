@@ -13,5 +13,8 @@
   "aliases": {
     "components": "src/renderer/components",
     "utils": "src/renderer/lib/utils"
+  },
+  "registries": {
+    "@react-bits": "https://reactbits.dev/r/{name}.json"
   }
 }

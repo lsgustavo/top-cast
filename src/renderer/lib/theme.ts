@@ -6,7 +6,8 @@ export type ThemeId =
   | 'emerald-matrix'
   | 'sunset-amber'
   | 'nordic-cyan'
-  | 'crimson-rose';
+  | 'crimson-rose'
+  | 'graphite';
 
 export interface ThemeOption {
   id: ThemeId;
@@ -72,6 +73,15 @@ export const THEME_OPTIONS: readonly ThemeOption[] = [
     secondaryColor: '#2e111a',
     bgColor: '#14070a',
     accentColor: '#fb7185',
+  },
+  {
+    id: 'graphite',
+    name: 'Graphite',
+    description: 'Preto profundo, cinza neutro e detalhes brancos',
+    primaryColor: '#e5e5e5',
+    secondaryColor: '#262626',
+    bgColor: '#0a0a0a',
+    accentColor: '#fafafa',
   },
 ] as const;
 
@@ -144,4 +154,3 @@ export function useTheme(): {
     themes: THEME_OPTIONS,
   };
 }
-

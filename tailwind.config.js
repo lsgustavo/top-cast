@@ -3,6 +3,10 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Haffer', 'Segoe UI', 'sans-serif'],
+        display: ['Fonte', 'Haffer', 'sans-serif'],
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -87,4 +91,3 @@ export default {
   },
   plugins: [],
 };
-

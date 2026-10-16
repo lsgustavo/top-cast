@@ -67,12 +67,12 @@ describe('Theme Switcher', () => {
   });
 
   it('persists and applies chosen theme to document.documentElement and localStorage', () => {
-    const targetTheme: ThemeId = 'cyber-blue';
+    const targetTheme: ThemeId = 'graphite';
     applyTheme(targetTheme);
 
-    assert.equal(document.documentElement.getAttribute('data-theme'), 'cyber-blue');
-    assert.equal(window.localStorage.getItem(THEME_STORAGE_KEY), 'cyber-blue');
-    assert.equal(getSavedTheme(), 'cyber-blue');
+    assert.equal(document.documentElement.getAttribute('data-theme'), 'graphite');
+    assert.equal(window.localStorage.getItem(THEME_STORAGE_KEY), 'graphite');
+    assert.equal(getSavedTheme(), 'graphite');
   });
 
   it('falls back to DEFAULT_THEME if stored theme id is invalid', () => {
@@ -80,4 +80,3 @@ describe('Theme Switcher', () => {
     assert.equal(getSavedTheme(), DEFAULT_THEME);
   });
 });
-
