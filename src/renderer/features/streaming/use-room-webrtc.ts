@@ -25,6 +25,14 @@ const PEER_CONNECTION_TIMEOUT_MS = 8_000;
 export const FULL_HD_VIDEO_MAX_BITRATE = 8_000_000;
 export const FULL_HD_VIDEO_MAX_FRAMERATE = 60;
 
+export function getRoomPresenterId(room: RoomSnapshot | null): string | null {
+  if (!room) return null;
+  if (room.presenterId && room.participants.some((p) => p.id === room.presenterId)) {
+    return room.presenterId;
+  }
+  return room.participants.find((p) => p.role === 'host')?.id ?? null;
+}
+
 export async function configureFullHdVideoSender(
   sender: RTCRtpSender,
   presetId: StreamQualityPresetId = '1080p60',
@@ -113,6 +121,7 @@ export function useRoomWebRtc(
   const remoteStreamsRef = useRef(new Map<string, MediaStream>());
   const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>());
   const selfParticipantIdRef = useRef<string | null>(null);
+  const presenterIdRef = useRef<string | null>(null);
   const roomRef = useRef<RoomSnapshot | null>(room);
   const qualityPresetRef = useRef<StreamQualityPresetId>(qualityPreset);
   const iceServersRequestRef = useRef<{
@@ -268,17 +277,16 @@ export function useRoomWebRtc(
         return;
       }
 
-      const isHost = currentRoom.participants.some(
-        (participant) => participant.id === socket.id && participant.role === 'host',
-      );
+      const activePresenterId = getRoomPresenterId(currentRoom);
+      const isPresenter = activePresenterId === socket.id;
       const remoteParticipant = currentRoom.participants.find(
         (participant) => participant.id === message.fromParticipantId,
       );
 
       try {
-        if (message.description.type === 'offer' && !isHost) {
+        if (message.description.type === 'offer' && !isPresenter && message.fromParticipantId === activePresenterId) {
           let connection = peerConnectionsRef.current.get(message.fromParticipantId);
-          if (!connection) {
+          if (!connection || connection.signalingState === 'closed') {
             const iceServers = await getIceServers();
             if (disposed) {
               return;
@@ -309,7 +317,7 @@ export function useRoomWebRtc(
           return;
         }
 
-        if (message.description.type === 'answer' && isHost && remoteParticipant?.role === 'guest') {
+        if (message.description.type === 'answer' && isPresenter && remoteParticipant && remoteParticipant.id !== activePresenterId) {
           const connection = peerConnectionsRef.current.get(message.fromParticipantId);
           if (!connection || connection.signalingState !== 'have-local-offer') {
             return;
@@ -388,7 +396,11 @@ export function useRoomWebRtc(
       };
     }
 
-    if (selfParticipantIdRef.current && selfParticipantIdRef.current !== self.id) {
+    const activePresenterId = getRoomPresenterId(room);
+    if (
+      (selfParticipantIdRef.current && selfParticipantIdRef.current !== self.id) ||
+      (presenterIdRef.current && presenterIdRef.current !== activePresenterId)
+    ) {
       for (const connection of peerConnectionsRef.current.values()) {
         connection.close();
       }
@@ -401,6 +413,7 @@ export function useRoomWebRtc(
       setRemoteStreams({});
     }
     selfParticipantIdRef.current = self.id;
+    presenterIdRef.current = activePresenterId;
 
     const participantsById = new Map(room.participants.map((participant) => [participant.id, participant]));
     for (const [peerId, connection] of peerConnectionsRef.current) {
@@ -424,7 +437,7 @@ export function useRoomWebRtc(
       }
     }
 
-    if (self.role !== 'host') {
+    if (self.id !== activePresenterId) {
       return () => {
         cancelled = true;
       };
@@ -432,7 +445,7 @@ export function useRoomWebRtc(
 
     const createHostConnections = async () => {
       const newGuests = room.participants.filter(
-        (participant) => participant.role === 'guest' && !peerConnectionsRef.current.has(participant.id),
+        (participant) => participant.id !== self.id && !peerConnectionsRef.current.has(participant.id),
       );
       if (newGuests.length === 0) {
         return;

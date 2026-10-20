@@ -246,15 +246,7 @@ export default function HomePage({
 
       {/* Botão de Configurações com Glass Effect */}
       <div className="absolute right-4 top-4 z-20 [-webkit-app-region:no-drag] sm:right-6 sm:top-6">
-        <SettingsDialog
-          displayName={displayName}
-          onDisplayNameChange={onDisplayNameChange}
-          avatarSeed={avatarSeed}
-          onAvatarSeedChange={(seed) => {
-            saveLocalAvatarSeed(seed);
-            setAvatarSeed(seed);
-          }}
-        />
+        <SettingsDialog />
       </div>
 
       <div className="relative z-10 my-auto w-full max-w-[520px]">

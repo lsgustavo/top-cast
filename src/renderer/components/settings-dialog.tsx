@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, Palette, Settings, User } from 'lucide-react';
 import {
   Dialog,
@@ -46,6 +46,7 @@ interface SettingsDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   defaultTab?: SettingsTab;
+  showProfileTab?: boolean;
   triggerLabel?: string;
   tooltipText?: string;
   displayName?: string;
@@ -88,6 +89,7 @@ export function SettingsDialog({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
   defaultTab = 'themes',
+  showProfileTab = false,
   triggerLabel = 'Abrir configurações do aplicativo',
   tooltipText = 'Configurações',
   displayName: externalDisplayName,
@@ -98,7 +100,10 @@ export function SettingsDialog({
   onPresenceChange,
 }: SettingsDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>(
+    showProfileTab ? defaultTab : 'themes',
+  );
   const { theme: currentTheme, setTheme, themes } = useTheme();
 
   const [localName, setLocalName] = useState<string>(() =>
@@ -114,19 +119,23 @@ export function SettingsDialog({
 
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled ? controlledOpen : internalOpen;
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
-      setActiveTab(defaultTab);
+    setTooltipOpen(false);
+    if (isOpen && !wasOpenRef.current) {
+      setActiveTab(showProfileTab ? defaultTab : 'themes');
       setLocalName(
         externalDisplayName !== undefined ? externalDisplayName : getStoredDisplayName(),
       );
       setLocalAvatarSeed(externalAvatarSeed || getOrCreateLocalAvatarSeed());
       setLocalPresence(externalPresence ?? getStoredPresence());
     }
-  }, [isOpen, defaultTab, externalDisplayName, externalAvatarSeed, externalPresence]);
+    wasOpenRef.current = isOpen;
+  }, [isOpen, defaultTab, showProfileTab, externalDisplayName, externalAvatarSeed, externalPresence]);
 
   const setOpen = (newOpen: boolean) => {
+    setTooltipOpen(false);
     if (!isControlled) {
       setInternalOpen(newOpen);
     }
@@ -205,7 +214,7 @@ export function SettingsDialog({
       {children ? (
         <DialogTrigger asChild>{children}</DialogTrigger>
       ) : (
-        <Tooltip>
+        <Tooltip open={!isOpen && tooltipOpen} onOpenChange={setTooltipOpen}>
           <TooltipTrigger asChild>
             <DialogTrigger asChild>
               <Button
@@ -213,6 +222,11 @@ export function SettingsDialog({
                 variant="ghost"
                 size="icon"
                 aria-label={triggerLabel}
+                onFocus={(e) => {
+                  if (!e.currentTarget.matches(':hover')) {
+                    setTooltipOpen(false);
+                  }
+                }}
                 className={cn(
                   'h-9 w-9 rounded-xl border border-border/40 bg-slate-900/60 text-slate-400 transition-all hover:bg-slate-800 hover:text-slate-100 focus-visible:ring-primary',
                   triggerClassName,
@@ -244,56 +258,60 @@ export function SettingsDialog({
                     Configurações
                   </DialogTitle>
                   <DialogDescription className="mt-0.5 text-xs text-slate-400">
-                    Personalize seu perfil de usuário, status na sala e aparência do aplicativo.
+                    {showProfileTab
+                      ? 'Personalize seu perfil de usuário, status na sala e aparência do aplicativo.'
+                      : 'Personalize a aparência e o tema de cores do aplicativo.'}
                   </DialogDescription>
                 </div>
               </div>
             </div>
           </DialogHeader>
 
-          {/* Abas: Temas | Perfil */}
-          <div
-            role="tablist"
-            aria-label="Abas de configurações"
-            className="mt-4 flex items-center gap-2 rounded-xl border border-border/40 bg-slate-950/60 p-1"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'themes'}
-              onClick={() => setActiveTab('themes')}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all',
-                activeTab === 'themes'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200',
-              )}
+          {/* Abas: Temas | Perfil (exibidas apenas dentro de uma sala ativa) */}
+          {showProfileTab && (
+            <div
+              role="tablist"
+              aria-label="Abas de configurações"
+              className="mt-4 flex items-center gap-2 rounded-xl border border-border/40 bg-slate-950/60 p-1"
             >
-              <Palette className="h-3.5 w-3.5" />
-              <span>Temas</span>
-            </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'themes'}
+                onClick={() => setActiveTab('themes')}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all',
+                  activeTab === 'themes'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200',
+                )}
+              >
+                <Palette className="h-3.5 w-3.5" />
+                <span>Temas</span>
+              </button>
 
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'user'}
-              onClick={() => setActiveTab('user')}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all',
-                activeTab === 'user'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200',
-              )}
-            >
-              <User className="h-3.5 w-3.5" />
-              <span>Perfil</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'user'}
+                onClick={() => setActiveTab('user')}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all',
+                  activeTab === 'user'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200',
+                )}
+              >
+                <User className="h-3.5 w-3.5" />
+                <span>Perfil</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Conteúdo das Abas */}
         <div className="max-h-[65vh] overflow-y-auto px-6 py-5">
-          {activeTab === 'themes' ? (
+          {!showProfileTab || activeTab === 'themes' ? (
             <section aria-labelledby="theme-section-title">
               <div className="flex items-center gap-2 pb-2">
                 <Palette className="h-4 w-4 text-primary" />
@@ -341,7 +359,12 @@ export function SettingsDialog({
                         }}
                       >
                         <div
-                          className="flex h-full flex-1 items-center gap-2.5 rounded-md px-3 border border-white/5"
+                          className={cn(
+                            'flex h-full flex-1 items-center gap-2.5 rounded-md px-3 border',
+                            themeOption.id === 'aurora-pearl'
+                              ? 'border-black/10 shadow-sm'
+                              : 'border-white/5',
+                          )}
                           style={{
                             backgroundColor: themeOption.secondaryColor,
                           }}

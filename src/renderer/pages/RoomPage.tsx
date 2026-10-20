@@ -16,9 +16,11 @@ import {
   Maximize,
   Minimize,
   Monitor,
+  MonitorUp,
   PictureInPicture2,
   Radio,
   RefreshCw,
+  RotateCcw,
   SlidersHorizontal,
   StopCircle,
   UserX,
@@ -55,14 +57,14 @@ import {
 import { formatRoomTimeRemaining, getParticipantAvatarHue, getParticipantInitials } from '../lib/room-ui';
 import { saveLocalAvatarSeed } from '../lib/voxel-avatar';
 import { VoxelAvatar } from '../components/voxel-avatar';
-import { updateAvatar, updateRoomDisplayName } from '../lib/room-client';
+import { updateAvatar, updateRoomDisplayName, updateRoomPresenter } from '../lib/room-client';
 import { useConnectionPing } from '../lib/use-connection-ping';
 import { playMuteSound, playStreamStartSound } from '../lib/presence-sound';
 import type { RoomParticipant, RoomSnapshot } from '../../shared/types/signaling';
 import type { CaptureSource } from '../../shared/types/desktop-api';
 import type { SignalingStatus } from '../../shared/types/signaling';
 import type { SignalingClient } from '../lib/signaling-client';
-import type { PeerConnectionStatus } from '../features/streaming/use-room-webrtc';
+import { getRoomPresenterId, type PeerConnectionStatus } from '../features/streaming/use-room-webrtc';
 import {
   STREAM_QUALITY_PRESET_LIST,
   STREAM_QUALITY_PRESETS,
@@ -1085,10 +1087,13 @@ export default function RoomPage({
 
   const isHost = room.participants.some((participant) => participant.id === selfParticipantId && participant.role === 'host');
   const host = room.participants.find((participant) => participant.role === 'host');
-  const remoteHostStream = host ? remoteStreams[host.id] ?? null : null;
-  const presentationStream = isHost ? localStream : remoteHostStream;
+  const activePresenterId = getRoomPresenterId(room);
+  const presenter = room.participants.find((participant) => participant.id === activePresenterId) ?? host;
+  const isPresenter = Boolean(selfParticipantId && activePresenterId === selfParticipantId);
+  const remoteHostStream = presenter ? remoteStreams[presenter.id] ?? null : null;
+  const presentationStream = isPresenter ? localStream : remoteHostStream;
   const isReceivingVideo = presentationStream !== null && (
-    isHost || presentationStream.getVideoTracks().some((track) => !track.muted && track.readyState === 'live')
+    isPresenter || presentationStream.getVideoTracks().some((track) => !track.muted && track.readyState === 'live')
   );
   const filteredSources = captureSources.filter((source) => source.kind === sourceKind);
   const signalingStatusLabels: Record<SignalingStatus, string> = {
@@ -1158,8 +1163,8 @@ export default function RoomPage({
 
     const handleRemotePlay = (payload: { fromParticipantId: string; clipId: string; volume?: number }) => {
       if (payload.fromParticipantId === selfParticipantId) return;
-      // Se o convidado silenciou a saída de áudio na sidebar, não reproduz efeitos remotos
-      if (!isHost && isViewerDeafened) return;
+      // Se o espectador silenciou a saída de áudio na sidebar, não reproduz efeitos remotos
+      if (!isPresenter && isViewerDeafened) return;
       const clip = SOUNDBOARD_CLIPS.find((c) => c.id === payload.clipId);
       if (clip) {
         const eqVolume = Math.max(0, Math.min(1, (payload.volume ?? 0.8) * getSoundboardVolume()));
@@ -1181,10 +1186,10 @@ export default function RoomPage({
       socket.off('room:soundboard-play', handleRemotePlay);
       socket.off('room:soundboard-stop', handleRemoteStop);
     };
-  }, [socket, selfParticipantId, isHost, isViewerDeafened]);
+  }, [socket, selfParticipantId, isPresenter, isViewerDeafened]);
 
   const handleToggleSidebarMute = () => {
-    if (isHost) {
+    if (isPresenter) {
       const nextEnabled = !systemAudioEnabled;
       playMuteSound(!nextEnabled);
       onToggleSystemAudio(nextEnabled);
@@ -1319,6 +1324,38 @@ export default function RoomPage({
     });
   }
 
+  async function handleSetPresenter(targetParticipantId: string, openPickerAfter = false) {
+    setParticipantActionError('');
+    if (isPresenter && targetParticipantId !== selfParticipantId) {
+      onStopCapture();
+    }
+    const targetParticipant = room.participants.find((p) => p.id === targetParticipantId);
+    const result = await updateRoomPresenter(socket, targetParticipantId);
+    if (!result.ok) {
+      setParticipantActionError(
+        result.error === 'NOT_ALLOWED'
+          ? 'Você não tem permissão para alterar o transmissor.'
+          : 'Não foi possível alterar o transmissor da sala.',
+      );
+      return;
+    }
+
+    setToastTone('success');
+    setToastMessage(
+      targetParticipantId === selfParticipantId
+        ? 'Você assumiu o controle da transmissão!'
+        : `Transmissão passada para ${targetParticipant?.displayName ?? 'o participante'}!`,
+    );
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage('');
+    }, 3_000);
+
+    if (openPickerAfter && targetParticipantId === selfParticipantId) {
+      openSourcePicker();
+    }
+  }
+
   function openSourcePicker() {
     setSelectedSourceId(null);
     void onPrepareSource(null, includeSystemAudio);
@@ -1435,6 +1472,9 @@ export default function RoomPage({
                 : participant.presence === 'away' ? 'Ausente' : 'Ocupado';
 
               const canKickThisParticipant = isHost && !isSelf && participant.role !== 'host';
+              const isParticipantPresenter = participant.id === activePresenterId;
+              const canPassPresenterToParticipant =
+                (isHost || isPresenter) && !isSelf && !isParticipantPresenter;
 
               return (
                 <li
@@ -1492,7 +1532,31 @@ export default function RoomPage({
                     </span>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    {participant.role === 'host' ? (
+                    {canPassPresenterToParticipant && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleSetPresenter(participant.id);
+                            }}
+                            aria-label={`Passar transmissão para ${participant.displayName}`}
+                            className="grid h-6 w-6 place-items-center rounded-lg border border-border/40 bg-slate-950/70 text-slate-400 transition-colors hover:border-primary/40 hover:bg-primary/15 hover:text-primary"
+                          >
+                            <MonitorUp className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Passar transmissão para {participant.displayName}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {isParticipantPresenter && participant.role !== 'host' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
+                        <Monitor className="h-3 w-3" />Transmissor
+                      </span>
+                    ) : participant.role === 'host' ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
                         <Crown className="h-3 w-3" />Host
                       </span>
@@ -1622,7 +1686,7 @@ export default function RoomPage({
               <div className="flex min-w-0 items-center gap-3">
                 <span
                   className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border transition-colors ${
-                    isHost
+                    isPresenter
                       ? hasSystemAudio && systemAudioEnabled
                         ? 'border-blue-500/20 bg-blue-500/15 text-blue-400'
                         : 'border-border/30 bg-slate-950/70 text-slate-500'
@@ -1631,7 +1695,7 @@ export default function RoomPage({
                         : 'border-border/30 bg-slate-950/70 text-slate-500'
                   }`}
                 >
-                  {isHost ? (
+                  {isPresenter ? (
                     hasSystemAudio && systemAudioEnabled ? (
                       <Volume2 className="h-4 w-4" />
                     ) : (
@@ -1648,7 +1712,7 @@ export default function RoomPage({
                     Áudio da tela
                   </span>
                   <span className="block truncate text-[11px] text-slate-400">
-                    {isHost
+                    {isPresenter
                       ? !hasSystemAudio
                         ? 'Nenhum som transmitido'
                         : systemAudioEnabled
@@ -1667,7 +1731,7 @@ export default function RoomPage({
                 {/* Botão de Top Sounds (Soundboard) que abre para CIMA e para a DIREITA */}
                 <TopSoundsDropdown placement="top-right" />
 
-                {(isHost ? hasSystemAudio : isReceivingVideo) && (
+                {(isPresenter ? hasSystemAudio : isReceivingVideo) && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -1675,7 +1739,7 @@ export default function RoomPage({
                         variant="ghost"
                         size="sm"
                         aria-label={
-                          isHost
+                          isPresenter
                             ? systemAudioEnabled
                               ? 'Desativar áudio da transmissão'
                               : 'Ativar áudio da transmissão'
@@ -1685,12 +1749,12 @@ export default function RoomPage({
                         }
                         onClick={handleToggleSidebarMute}
                         className={`h-8 px-2.5 text-xs font-medium gap-1.5 rounded-xl border border-border/40 transition-all ${
-                          (isHost ? systemAudioEnabled : !isViewerDeafened)
+                          (isPresenter ? systemAudioEnabled : !isViewerDeafened)
                             ? 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-slate-100'
                             : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
                         }`}
                       >
-                        {(isHost ? systemAudioEnabled : !isViewerDeafened) ? (
+                        {(isPresenter ? systemAudioEnabled : !isViewerDeafened) ? (
                           <>
                             <VolumeX className="h-3.5 w-3.5 text-slate-400" />
                             <span>Mutar</span>
@@ -1704,7 +1768,7 @@ export default function RoomPage({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top">
-                      {(isHost ? systemAudioEnabled : !isViewerDeafened)
+                      {(isPresenter ? systemAudioEnabled : !isViewerDeafened)
                         ? 'Mutar o som transmitido'
                         : 'Transmitir o som da tela'}
                     </TooltipContent>
@@ -1817,6 +1881,7 @@ export default function RoomPage({
 
                           <SettingsDialog
                             defaultTab="user"
+                            showProfileTab
                             triggerLabel="Configurações de perfil"
                             tooltipText="Configurações de perfil"
                             triggerClassName="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/40 bg-slate-900 text-slate-400 shadow-sm transition-colors duration-150 hover:border-border/80 hover:bg-slate-800 hover:text-slate-100 active:scale-95"
@@ -1913,7 +1978,7 @@ export default function RoomPage({
         <header className={`flex shrink-0 items-center justify-between gap-4 border-b border-border/40 pb-4 [-webkit-app-region:drag] ${isStreamFullscreen ? 'hidden' : ''}`}>
           <div>
             <h2 className="text-base font-semibold tracking-tight text-slate-100">Sala de transmissão</h2>
-            <p className="mt-0.5 text-xs text-slate-400">{isHost ? 'Compartilhe sua tela com a sala' : 'Acompanhe a transmissão'}</p>
+            <p className="mt-0.5 text-xs text-slate-400">{isPresenter ? 'Compartilhe sua tela com a sala' : 'Acompanhe a transmissão'}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2 [-webkit-app-region:no-drag]">
             {onOpenWelcome && (
@@ -1934,6 +1999,7 @@ export default function RoomPage({
               </Tooltip>
             )}
             <SettingsDialog
+              showProfileTab
               displayName={
                 room.participants.find((p) => p.id === selfParticipantId)?.displayName
               }
@@ -2061,7 +2127,7 @@ export default function RoomPage({
                           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
                           <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
                         </span>
-                        <span>{isHost ? 'Sua tela está sendo compartilhada' : `${host?.displayName ?? 'Host'} está compartilhando`}</span>
+                        <span>{isPresenter ? 'Sua tela está sendo compartilhada' : `${presenter?.displayName ?? host?.displayName ?? 'Host'} está compartilhando`}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Tooltip>
@@ -2083,7 +2149,27 @@ export default function RoomPage({
                           </TooltipContent>
                         </Tooltip>
 
-                        {isHost && (
+                        {isHost && !isPresenter && selfParticipantId && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => void handleSetPresenter(selfParticipantId)}
+                                className="h-9 gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 text-xs font-medium text-amber-300 shadow-sm transition-all hover:border-amber-500/40 hover:bg-amber-500/20 hover:text-amber-200"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                <span>Retomar transmissão</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              Retomar o controle da transmissão como Host
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+
+                        {isPresenter && (
                           <>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -2102,6 +2188,26 @@ export default function RoomPage({
                                 Alterar a tela ou janela transmitida sem interromper a transmissão
                               </TooltipContent>
                             </Tooltip>
+
+                            {!isHost && host && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => void handleSetPresenter(host.id)}
+                                    className="h-9 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-3.5 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    <span>Devolver ao Host</span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  Encerrar sua apresentação e devolver controle para {host.displayName}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
 
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -2134,7 +2240,7 @@ export default function RoomPage({
                   >
                     <StreamVideo
                       stream={presentationStream}
-                      isHost={isHost}
+                      isHost={isPresenter}
                       participants={room.participants}
                       selfParticipantId={selfParticipantId}
                       localAvatarSeedOverride={localAvatarSeedOverride}
@@ -2161,7 +2267,7 @@ export default function RoomPage({
                       <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                     </span>
                     <span className="font-medium">
-                      {isHost ? 'Sala Pronta para Transmissão' : 'Aguardando Início do Host'}
+                      {isPresenter ? 'Sala Pronta para Transmissão' : 'Aguardando Início do Host'}
                     </span>
                   </div>
 
@@ -2177,12 +2283,12 @@ export default function RoomPage({
 
                   {/* Títulos e descrição profissional */}
                   <h2 className="relative text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                    {isHost ? 'Compartilhe sua tela' : 'Aguardando transmissão'}
+                    {isPresenter ? 'Compartilhe sua tela' : 'Aguardando transmissão'}
                   </h2>
                   <p className="relative mt-2.5 max-w-lg text-center text-sm leading-relaxed text-slate-400">
-                    {isHost
+                    {isPresenter
                       ? 'Transmita monitores inteiros ou janelas específicas com áudio em alta definição e latência ultrabaixa para todos na sala.'
-                      : 'O host ainda não iniciou a transmissão. O vídeo da tela aparecerá automaticamente aqui assim que ele começar.'}
+                      : `${presenter?.displayName ?? 'O host'} ainda não iniciou a transmissão. O vídeo da tela aparecerá automaticamente aqui assim que começar.`}
                   </p>
 
                   {/* Chips informativos das funcionalidades */}
@@ -2201,9 +2307,9 @@ export default function RoomPage({
                     </div>
                   </div>
 
-                  {/* Botão de ação (Host) ou indicador de espera (Viewer) */}
-                  {isHost ? (
-                    <div className="relative mt-7">
+                  {/* Botão de ação (Transmissor) ou indicador de espera + opção de assumir */}
+                  {isPresenter ? (
+                    <div className="relative mt-7 flex flex-wrap items-center justify-center gap-2.5">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -2220,20 +2326,64 @@ export default function RoomPage({
                           Selecionar tela ou janela para transmitir
                         </TooltipContent>
                       </Tooltip>
+
+                      {!isHost && host && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="lg"
+                              onClick={() => void handleSetPresenter(host.id)}
+                              className="h-11 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-4 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              <span>Devolver ao Host</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Devolver controle de transmissão para {host.displayName}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   ) : (
-                    <div className="relative mt-7 inline-flex items-center gap-2 rounded-xl border border-border/40 bg-slate-950/50 px-4 py-2 text-xs text-slate-400 shadow-sm backdrop-blur-md">
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
-                      </span>
-                      <span>Conectado à sala &middot; Sincronizando transmissão</span>
+                    <div className="relative mt-7 flex flex-col items-center gap-3">
+                      <div className="inline-flex items-center gap-2 rounded-xl border border-border/40 bg-slate-950/50 px-4 py-2 text-xs text-slate-400 shadow-sm backdrop-blur-md">
+                        <span className="relative flex h-2 w-2">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+                        </span>
+                        <span>Conectado à sala &middot; Sincronizando transmissão</span>
+                      </div>
+
+                      {selfParticipantId && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void handleSetPresenter(selfParticipantId, true)}
+                              className="h-9 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-4 text-xs font-medium text-slate-300 shadow-sm transition-all hover:border-primary/40 hover:bg-slate-800 hover:text-slate-100"
+                            >
+                              <MonitorUp className="h-3.5 w-3.5 text-primary" />
+                              <span>{isHost ? 'Retomar transmissão' : 'Transmitir minha tela'}</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            {isHost
+                              ? 'Retomar controle da transmissão e escolher tela'
+                              : 'Assumir transmissão para compartilhar sua tela na sala'}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              {captureError && isHost && !isSourcePickerOpen && (
+              {captureError && isPresenter && !isSourcePickerOpen && (
                 <p role="alert" className="mx-auto mt-4 inline-flex w-fit max-w-full items-start gap-2 break-words rounded-xl border border-red-500/20 bg-red-400/10 px-3.5 py-2.5 text-sm text-red-200">
                   <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
                   {captureError}

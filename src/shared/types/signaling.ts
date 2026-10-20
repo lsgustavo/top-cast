@@ -50,6 +50,7 @@ export interface RoomSnapshot {
   expiresAt: number;
   participants: RoomParticipant[];
   maxParticipants: number;
+  presenterId?: string;
 }
 
 export type RoomErrorCode =
@@ -112,6 +113,14 @@ export type KickParticipantResult =
 export type PresenceStateResult =
   | { ok: true }
   | { ok: false; error: 'NOT_IN_ROOM' | 'INVALID_STATE' };
+
+export interface SetPresenterPayload {
+  participantId: string;
+}
+
+export type SetPresenterResult =
+  | { ok: true; room: RoomSnapshot }
+  | { ok: false; error: 'NOT_IN_ROOM' | 'NOT_ALLOWED' | 'INVALID_PARTICIPANT' };
 
 export interface WebRtcDescriptionPayload {
   toParticipantId: string;
@@ -203,6 +212,10 @@ export interface ClientToServerEvents {
   'room:name': (
     payload: DisplayNamePayload,
     acknowledge: (result: DisplayNameResult) => void,
+  ) => void;
+  'room:presenter': (
+    payload: SetPresenterPayload,
+    acknowledge: (result: SetPresenterResult) => void,
   ) => void;
   'webrtc:description': (
     payload: WebRtcDescriptionPayload,

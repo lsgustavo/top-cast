@@ -15,10 +15,20 @@ const AlertDialogOverlay = ({ className, ...props }: AlertDialogPrimitive.AlertD
   />
 );
 
-const AlertDialogContent = ({ className, ...props }: AlertDialogPrimitive.AlertDialogContentProps) => (
+const AlertDialogContent = ({
+  className,
+  onCloseAutoFocus,
+  ...props
+}: AlertDialogPrimitive.AlertDialogContentProps) => (
   <AlertDialogPortal>
     <AlertDialogOverlay />
     <AlertDialogPrimitive.Content
+      onCloseAutoFocus={(event) => {
+        onCloseAutoFocus?.(event);
+        if (!event.defaultPrevented) {
+          event.preventDefault();
+        }
+      }}
       className={cn(
         'fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 scale-95 rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 opacity-0 shadow-2xl backdrop-blur-xl outline-none transition duration-200 data-[state=open]:scale-100 data-[state=open]:opacity-100 data-[state=closed]:scale-95 data-[state=closed]:opacity-0',
         className,

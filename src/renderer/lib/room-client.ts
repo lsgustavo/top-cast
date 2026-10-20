@@ -1,4 +1,9 @@
-import type { AvatarResult, DisplayNameResult, RoomOperationResult } from '../../shared/types/signaling';
+import type {
+  AvatarResult,
+  DisplayNameResult,
+  RoomOperationResult,
+  SetPresenterResult,
+} from '../../shared/types/signaling';
 import type { SignalingClient } from './signaling-client';
 
 const CONNECTION_TIMEOUT_MS = 8_000;
@@ -113,6 +118,23 @@ export async function updateRoomDisplayName(
     }, REQUEST_TIMEOUT_MS);
 
     socket.emit('room:name', { displayName }, (result) => {
+      window.clearTimeout(timeout);
+      resolve(result ?? { ok: false, error: 'NOT_IN_ROOM' });
+    });
+  });
+}
+
+export async function updateRoomPresenter(
+  socket: SignalingClient,
+  participantId: string,
+): Promise<SetPresenterResult> {
+  await ensureConnected(socket);
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => {
+      resolve({ ok: false, error: 'NOT_IN_ROOM' });
+    }, REQUEST_TIMEOUT_MS);
+
+    socket.emit('room:presenter', { participantId }, (result) => {
       window.clearTimeout(timeout);
       resolve(result ?? { ok: false, error: 'NOT_IN_ROOM' });
     });

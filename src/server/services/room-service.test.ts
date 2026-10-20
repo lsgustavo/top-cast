@@ -257,4 +257,41 @@ describe('RoomService', () => {
     assert.ok(renamed);
     assert.equal(renamed?.participants.find((p) => p.id === 'guest-direct')?.displayName, 'Bob Novo Nome');
   });
+
+  it('supports presenter handoff between host and guests and updates signaling authorization', () => {
+    const service = new RoomService();
+    const created = service.create('host', 'Host', 100);
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+    assert.equal(created.room.presenterId, 'host');
+
+    const joined1 = service.join('guest-1', created.room.inviteCode, 'Guest 1', 110);
+    const joined2 = service.join('guest-2', created.room.inviteCode, 'Guest 2', 120);
+    assert.equal(joined1.ok, true);
+    assert.equal(joined2.ok, true);
+
+    // Non-presenter guest cannot assign another third party as presenter
+    assert.deepEqual(service.setPresenter('guest-1', 'guest-2'), {
+      ok: false,
+      error: 'NOT_ALLOWED',
+    });
+
+    // Host passes presentation to guest-1
+    const handedOff = service.setPresenter('host', 'guest-1');
+    assert.equal(handedOff.ok, true);
+    if (!handedOff.ok) return;
+    assert.equal(handedOff.room.presenterId, 'guest-1');
+
+    // Now guest-1 is authorized to send offers and receive answers (including from host)
+    assert.equal(service.authorizeSignal('guest-1', 'host', 'offer'), undefined);
+    assert.equal(service.authorizeSignal('host', 'guest-1', 'answer'), undefined);
+    assert.equal(service.authorizeSignal('guest-1', 'guest-2', 'offer'), undefined);
+    assert.equal(service.authorizeSignal('guest-2', 'guest-1', 'answer'), undefined);
+    assert.equal(service.authorizeSignal('host', 'guest-1', 'offer'), 'NOT_ALLOWED');
+
+    // When the active guest presenter leaves, presenterId automatically falls back to host
+    const leaveResult = service.leave('guest-1', 130);
+    assert.equal(leaveResult?.snapshot?.presenterId, 'host');
+    assert.equal(service.authorizeSignal('host', 'guest-2', 'offer'), undefined);
+  });
 });

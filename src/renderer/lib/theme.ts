@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
 export type ThemeId =
+  | 'graphite'
+  | 'aurora-pearl'
   | 'cyber-blue'
   | 'midnight-violet'
   | 'emerald-matrix'
@@ -19,6 +21,24 @@ export interface ThemeOption {
 }
 
 export const THEME_OPTIONS: readonly ThemeOption[] = [
+  {
+    id: 'graphite',
+    name: 'Graphite',
+    description: 'Grafite neutro minimalista com acabamento carbono fosco',
+    primaryColor: '#94a3b8',
+    secondaryColor: '#27272a',
+    bgColor: '#09090b',
+    accentColor: '#cbd5e1',
+  },
+  {
+    id: 'aurora-pearl',
+    name: 'Aurora Pearl',
+    description: 'Pérola luminosa com brisa índigo suave (Modo Claro)',
+    primaryColor: '#6366f1',
+    secondaryColor: '#ffffff',
+    bgColor: '#eef2f8',
+    accentColor: '#818cf8',
+  },
   {
     id: 'midnight-violet',
     name: 'Midnight Violet',
@@ -75,7 +95,7 @@ export const THEME_OPTIONS: readonly ThemeOption[] = [
   },
 ] as const;
 
-export const DEFAULT_THEME: ThemeId = 'midnight-violet';
+export const DEFAULT_THEME: ThemeId = 'graphite';
 export const THEME_STORAGE_KEY = 'topcast:theme';
 
 export function getSavedTheme(): ThemeId {
@@ -144,4 +164,3 @@ export function useTheme(): {
     themes: THEME_OPTIONS,
   };
 }
-

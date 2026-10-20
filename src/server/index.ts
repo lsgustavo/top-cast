@@ -301,6 +301,20 @@ io.on('connection', (socket) => {
     acknowledge(result);
   });
 
+  socket.on('room:presenter', (payload, acknowledge) => {
+    if (typeof acknowledge !== 'function') {
+      app.log.warn({ socketId: socket.id }, 'Rejected room:presenter without acknowledgment callback');
+      return;
+    }
+
+    const result = roomService.setPresenter(socket.id, payload?.participantId);
+    if (result.ok) {
+      io.to(result.room.id).emit('room:updated', result.room);
+      io.emit('room:availability', roomService.getAvailabilityInfo());
+    }
+    acknowledge(result);
+  });
+
   socket.on('webrtc:description', (payload, acknowledge) => {
     if (typeof acknowledge !== 'function') {
       app.log.warn({ socketId: socket.id }, 'Rejected webrtc:description without acknowledgment callback');

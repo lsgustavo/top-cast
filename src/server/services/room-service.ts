@@ -6,6 +6,7 @@ import type {
   RoomOperationResult,
   RoomParticipant,
   RoomSnapshot,
+  SetPresenterResult,
   WebRtcSignalError,
 } from '../../shared/types/signaling.js';
 
@@ -20,6 +21,7 @@ interface Room {
   id: string;
   inviteCode: string;
   hostSocketId: string;
+  presenterSocketId: string;
   expiresAt: number;
   participants: Map<string, RoomParticipant>;
 }
@@ -68,6 +70,7 @@ export class RoomService {
       id: randomUUID(),
       inviteCode: this.createInviteCode(),
       hostSocketId: socketId,
+      presenterSocketId: socketId,
       expiresAt: now + ROOM_TTL_MS,
       participants: new Map(),
     };
@@ -226,6 +229,9 @@ export class RoomService {
         if (nextHost) {
           nextHost.role = 'host';
           room.hostSocketId = nextHost.id;
+          if (room.presenterSocketId === socketId || !room.participants.has(room.presenterSocketId)) {
+            room.presenterSocketId = nextHost.id;
+          }
           return {
             roomId,
             roomClosed: false,
@@ -240,6 +246,9 @@ export class RoomService {
     }
 
     room.participants.delete(socketId);
+    if (room.presenterSocketId === socketId) {
+      room.presenterSocketId = room.hostSocketId;
+    }
     return {
       roomId,
       roomClosed: false,
@@ -290,6 +299,9 @@ export class RoomService {
 
     room.participants.delete(participantId);
     this.roomIdsBySocketId.delete(participantId);
+    if (room.presenterSocketId === participantId) {
+      room.presenterSocketId = room.hostSocketId;
+    }
     return {
       roomId: room.id,
       roomClosed: false,
@@ -343,6 +355,30 @@ export class RoomService {
     return this.toSnapshot(room);
   }
 
+  setPresenter(requesterSocketId: string, rawTargetParticipantId: unknown): SetPresenterResult {
+    const roomId = this.roomIdsBySocketId.get(requesterSocketId);
+    const room = roomId ? this.roomsById.get(roomId) : undefined;
+    const requester = room?.participants.get(requesterSocketId);
+    if (!room || !requester) {
+      return { ok: false, error: 'NOT_IN_ROOM' };
+    }
+
+    if (typeof rawTargetParticipantId !== 'string' || !room.participants.has(rawTargetParticipantId)) {
+      return { ok: false, error: 'INVALID_PARTICIPANT' };
+    }
+
+    const isHost = room.hostSocketId === requesterSocketId || requester.role === 'host';
+    const isCurrentPresenter = room.presenterSocketId === requesterSocketId;
+    const isSelfClaim = rawTargetParticipantId === requesterSocketId;
+
+    if (!isHost && !isCurrentPresenter && !isSelfClaim) {
+      return { ok: false, error: 'NOT_ALLOWED' };
+    }
+
+    room.presenterSocketId = rawTargetParticipantId;
+    return { ok: true, room: this.toSnapshot(room) };
+  }
+
   authorizeSignal(
     fromSocketId: string,
     toSocketId: string,
@@ -360,13 +396,14 @@ export class RoomService {
     const room = this.roomsById.get(roomId);
     const sender = room?.participants.get(fromSocketId);
     const receiver = room?.participants.get(toSocketId);
-    if (!sender || !receiver || sender.id === receiver.id) {
+    if (!room || !sender || !receiver || sender.id === receiver.id) {
       return 'PEER_NOT_IN_ROOM';
     }
 
+    const presenterId = room.presenterSocketId || room.hostSocketId;
     if (
-      (signalType === 'offer' && sender.role !== 'host') ||
-      (signalType === 'answer' && (sender.role !== 'guest' || receiver.role !== 'host'))
+      (signalType === 'offer' && sender.id !== presenterId) ||
+      (signalType === 'answer' && (sender.id === presenterId || receiver.id !== presenterId))
     ) {
       return 'NOT_ALLOWED';
     }
@@ -449,6 +486,7 @@ export class RoomService {
       expiresAt: room.expiresAt,
       participants: Array.from(room.participants.values()),
       maxParticipants: MAX_PARTICIPANTS,
+      presenterId: room.presenterSocketId,
     };
   }
 }

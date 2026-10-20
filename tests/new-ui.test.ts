@@ -179,6 +179,10 @@ describe('New UI Refactoring & Media Controls (NewUI.md)', () => {
     const homePageContent = fs.readFileSync(homePagePath, 'utf8');
     assert.ok(homePageContent.includes('<AvatarPickerDialog'));
     assert.ok(!homePageContent.includes('<Dice5'));
+    assert.ok(!homePageContent.includes('showProfileTab'));
+
+    assert.ok(settingsDialogContent.includes('showProfileTab = false'));
+    assert.ok(roomPageContent.includes('showProfileTab'));
 
     const avatarPickerPath = path.resolve('src/renderer/components/avatar-picker-dialog.tsx');
     const avatarPickerContent = fs.readFileSync(avatarPickerPath, 'utf8');
@@ -235,5 +239,18 @@ describe('New UI Refactoring & Media Controls (NewUI.md)', () => {
     assert.equal(formatResolutionBadge(1280, 720), 'HD');
     assert.equal(formatResolutionBadge(854, 480), 'SD');
     assert.equal(formatResolutionBadge(null, null), '—');
+  });
+
+  it('implements multi-presenter handoff ("Passar a Tela") in RoomPage and useRoomWebRtc', () => {
+    assert.ok(roomPageContent.includes('handleSetPresenter'));
+    assert.ok(roomPageContent.includes('Passar transmissão para'));
+    assert.ok(roomPageContent.includes('Transmissor'));
+    assert.ok(roomPageContent.includes('Devolver ao Host'));
+    assert.ok(roomPageContent.includes('Retomar transmissão'));
+    assert.ok(roomPageContent.includes('Transmitir minha tela'));
+
+    const webrtcHookPath = path.resolve('src/renderer/features/streaming/use-room-webrtc.ts');
+    const webrtcHookContent = fs.readFileSync(webrtcHookPath, 'utf8');
+    assert.ok(webrtcHookContent.includes('getRoomPresenterId'));
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dice5, Pencil } from 'lucide-react';
 import {
   Dialog,
@@ -37,17 +37,20 @@ export function AvatarPickerDialog({
   children,
 }: AvatarPickerDialogProps) {
   const [open, setOpen] = useState(false);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
   const [selectedSeed, setSelectedSeed] = useState(avatarSeed);
   const [options, setOptions] = useState<string[]>(() =>
     generateRandomAvatarOptions(8, avatarSeed),
   );
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
     setSelectedSeed(avatarSeed);
   }, [avatarSeed]);
 
   useEffect(() => {
-    if (open) {
+    setTooltipOpen(false);
+    if (open && !wasOpenRef.current) {
       setSelectedSeed(avatarSeed);
       setOptions((prev) => {
         if (prev.length === 8 && prev.includes(avatarSeed)) {
@@ -56,6 +59,7 @@ export function AvatarPickerDialog({
         return generateRandomAvatarOptions(8, avatarSeed);
       });
     }
+    wasOpenRef.current = open;
   }, [open, avatarSeed]);
 
   function handleRandomizeOptions() {
@@ -68,16 +72,27 @@ export function AvatarPickerDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setTooltipOpen(false);
+        setOpen(nextOpen);
+      }}
+    >
       {children ? (
         <DialogTrigger asChild>{children}</DialogTrigger>
       ) : (
-        <Tooltip>
+        <Tooltip open={!open && tooltipOpen} onOpenChange={setTooltipOpen}>
           <TooltipTrigger asChild>
             <DialogTrigger asChild>
               <button
                 type="button"
                 aria-label={triggerLabel}
+                onFocus={(e) => {
+                  if (!e.currentTarget.matches(':hover')) {
+                    setTooltipOpen(false);
+                  }
+                }}
                 className={cn(
                   'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/40 bg-slate-950/70 text-slate-400 shadow-sm transition-colors duration-150 hover:border-border/80 hover:bg-slate-800/70 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   triggerClassName,

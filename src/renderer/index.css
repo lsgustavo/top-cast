@@ -64,6 +64,131 @@
   }
 
   :root,
+  html[data-theme='graphite'] {
+    --primary: 215 20% 65%;
+    --primary-foreground: 240 10% 6%;
+    --primary-50: 210 40% 98%;
+    --primary-100: 210 40% 96%;
+    --primary-200: 214 32% 91%;
+    --primary-300: 213 27% 84%;
+    --primary-400: 215 20% 72%;
+    --primary-500: 215 20% 65%;
+    --primary-600: 215 16% 52%;
+    --primary-700: 215 19% 40%;
+    --primary-800: 217 19% 29%;
+    --primary-900: 220 20% 20%;
+    --primary-950: 222 24% 12%;
+
+    --slate-50: 240 5% 98%;
+    --slate-100: 240 5% 96%;
+    --slate-200: 240 5% 90%;
+    --slate-300: 240 5% 82%;
+    --slate-400: 240 5% 65%;
+    --slate-500: 240 4% 46%;
+    --slate-600: 240 5% 34%;
+    --slate-700: 240 5% 24%;
+    --slate-800: 240 5% 16%;
+    --slate-900: 240 6% 10%;
+    --slate-950: 240 10% 6%;
+
+    --background: 240 10% 6%;
+    --foreground: 240 5% 98%;
+    --card: 240 6% 10%;
+    --card-foreground: 240 5% 98%;
+    --popover: 240 6% 10%;
+    --popover-foreground: 240 5% 98%;
+    --secondary: 240 5% 16%;
+    --secondary-foreground: 240 5% 98%;
+    --tertiary: 240 6% 22%;
+    --tertiary-foreground: 240 5% 98%;
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 5% 16%;
+    --accent-foreground: 240 5% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 240 5% 16%;
+    --input: 240 5% 24%;
+    --ring: 215 20% 65%;
+    --radius: 0.75rem;
+
+    --wave-1-color: #52525b;
+    --wave-1-deep: #18181b;
+    --wave-1-stroke: #a1a1aa;
+    --wave-2-color: #71717a;
+    --wave-2-stroke: #d4d4d8;
+    --wave-3-color: #94a3b8;
+    --wave-3-mid: #3f3f46;
+    --wave-3-stroke: #e4e4e7;
+    --glow-accent-1: rgba(148, 163, 184, 0.11);
+    --glow-accent-2: rgba(212, 212, 216, 0.07);
+  }
+
+  html[data-theme='aurora-pearl'] {
+    --primary: 239 84% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-50: 242 47% 18%;
+    --primary-100: 240 55% 26%;
+    --primary-200: 239 70% 35%;
+    --primary-300: 239 78% 43%;
+    --primary-400: 239 82% 50%;
+    --primary-500: 239 84% 58%;
+    --primary-600: 239 84% 52%;
+    --primary-700: 239 76% 44%;
+    --primary-800: 226 100% 93%;
+    --primary-900: 226 100% 96%;
+    --primary-950: 226 100% 98%;
+
+    /* Hierarquia de superfícies pensada para Light Mode profissional:
+       - slate-900 = Branco puro (#ffffff) para Cards, Modais e Dropdowns elevados
+       - slate-950 = Pérola frio sutil (#eef2f8) para Inputs, Wells recuados e Sidebar
+       - slate-800 = Cinza-azulado tátil (#e2e8f2) para Botões secundários, Badges e Divisores
+       - slate-50..400 = Escala tipográfica de alto contraste (tinta profunda -> ardósia média) */
+    --slate-50: 224 47% 10%;
+    --slate-100: 222 45% 13%;
+    --slate-200: 220 38% 20%;
+    --slate-300: 218 28% 30%;
+    --slate-400: 215 20% 43%;
+    --slate-500: 215 16% 52%;
+    --slate-600: 214 20% 66%;
+    --slate-700: 214 26% 82%;
+    --slate-800: 214 30% 90%;
+    --slate-900: 0 0% 100%;
+    --slate-950: 216 33% 95%;
+
+    --background: 216 33% 96%;
+    --foreground: 224 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 47% 11%;
+    --secondary: 214 30% 91%;
+    --secondary-foreground: 222 45% 13%;
+    --tertiary: 226 70% 93%;
+    --tertiary-foreground: 239 70% 35%;
+    --muted: 214 30% 91%;
+    --muted-foreground: 215 20% 42%;
+    --accent: 214 30% 91%;
+    --accent-foreground: 222 45% 13%;
+    --destructive: 0 84% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 25% 74%;
+    --input: 214 26% 80%;
+    --ring: 239 84% 58%;
+    --radius: 0.75rem;
+
+    --wave-1-color: #6366f1;
+    --wave-1-deep: #c7d2fe;
+    --wave-1-stroke: #4f46e5;
+    --wave-2-color: #818cf8;
+    --wave-2-stroke: #6366f1;
+    --wave-3-color: #a5b4fc;
+    --wave-3-mid: #4f46e5;
+    --wave-3-stroke: #4338ca;
+    --glow-accent-1: rgba(99, 102, 241, 0.14);
+    --glow-accent-2: rgba(56, 189, 248, 0.11);
+  }
+
   html[data-theme='midnight-violet'] {
     --primary: 271 91% 65%;
     --primary-foreground: 210 40% 98%;
@@ -396,6 +521,252 @@
   button {
     font: inherit;
   }
+}
+
+/* =========================================================================
+   Aurora Pearl — Design System de Modo Claro (Light Mode Profissional)
+   ========================================================================= */
+
+/* 1. Fundo global com iluminação radial sutil estilo Linear / Apple */
+html[data-theme='aurora-pearl'] body {
+  background-color: hsl(var(--background));
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.10), transparent 65%),
+    radial-gradient(ellipse 60% 40% at 85% 20%, rgba(56, 189, 248, 0.06), transparent 60%);
+}
+
+/* 2. Isolamento do Player de Vídeo (.bg-black):
+      Mantém os controles flutuantes, HUD de estatísticas e tiles imersivos
+      com paleta dark glassmorphic sobre o vídeo escuro */
+html[data-theme='aurora-pearl'] .bg-black {
+  --slate-50: 240 5% 98%;
+  --slate-100: 240 5% 96%;
+  --slate-200: 240 5% 90%;
+  --slate-300: 240 5% 82%;
+  --slate-400: 240 5% 65%;
+  --slate-500: 240 4% 46%;
+  --slate-600: 240 5% 34%;
+  --slate-700: 240 5% 24%;
+  --slate-800: 240 5% 16%;
+  --slate-900: 240 6% 10%;
+  --slate-950: 240 10% 6%;
+  --border: 240 5% 22%;
+  --foreground: 240 5% 98%;
+}
+
+/* 3. Elevação de Cards, Painéis, Sidebar e Modais no Modo Claro */
+html[data-theme='aurora-pearl'] .bg-slate-900\/40,
+html[data-theme='aurora-pearl'] .bg-slate-900\/50,
+html[data-theme='aurora-pearl'] .bg-slate-900\/60 {
+  background-color: rgba(255, 255, 255, 0.90);
+  border-color: rgba(15, 23, 42, 0.09);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px -6px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+html[data-theme='aurora-pearl'] button.bg-slate-900\/50:hover,
+html[data-theme='aurora-pearl'] button.bg-slate-900\/60:hover {
+  background-color: #ffffff;
+  border-color: hsl(var(--primary) / 0.45);
+  box-shadow:
+    0 10px 26px -6px rgba(79, 70, 229, 0.12),
+    0 2px 6px -1px rgba(15, 23, 42, 0.05);
+}
+
+html[data-theme='aurora-pearl'] .bg-slate-900\/85,
+html[data-theme='aurora-pearl'] .bg-slate-900\/90,
+html[data-theme='aurora-pearl'] .bg-slate-900\/95 {
+  background-color: rgba(255, 255, 255, 0.98);
+  border-color: rgba(15, 23, 42, 0.10);
+  box-shadow:
+    0 20px 45px -12px rgba(15, 23, 42, 0.16),
+    0 4px 12px -2px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* Wells e seções agrupadas dentro de cards/modais (Hierarquia de 3 níveis) */
+html[data-theme='aurora-pearl'] .bg-slate-950\/30,
+html[data-theme='aurora-pearl'] .bg-slate-950\/40,
+html[data-theme='aurora-pearl'] .bg-slate-950\/50,
+html[data-theme='aurora-pearl'] .bg-slate-950\/60,
+html[data-theme='aurora-pearl'] .bg-slate-950\/70 {
+  background-color: #f3f6fb;
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+/* Barra lateral da sala em modo claro: branco translúcido com divisória nítida */
+html[data-theme='aurora-pearl'] aside.bg-slate-950\/70 {
+  background-color: rgba(255, 255, 255, 0.88);
+  border-color: rgba(15, 23, 42, 0.09);
+  box-shadow: 4px 0 24px -8px rgba(15, 23, 42, 0.05);
+}
+
+/* Restaura superfícies escuras translúcidas dentro do player de vídeo (.bg-black) */
+html[data-theme='aurora-pearl'] .bg-black .bg-slate-900\/50,
+html[data-theme='aurora-pearl'] .bg-black .bg-slate-900\/60,
+html[data-theme='aurora-pearl'] .bg-black .bg-slate-900\/70,
+html[data-theme='aurora-pearl'] .bg-black .bg-slate-900\/80 {
+  background-color: rgba(24, 24, 27, 0.78);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme='aurora-pearl'] .bg-black .bg-slate-900\/95,
+html[data-theme='aurora-pearl'] .bg-black .bg-slate-950\/85,
+html[data-theme='aurora-pearl'] .bg-black .bg-slate-950\/75 {
+  background-color: rgba(9, 9, 11, 0.90);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+}
+
+/* 4. Inputs, Caixas de Código e Wells Recuados */
+html[data-theme='aurora-pearl'] input.bg-slate-950\/80,
+html[data-theme='aurora-pearl'] input.bg-slate-900\/90 {
+  background-color: #ffffff;
+  border-color: rgba(15, 23, 42, 0.15);
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+html[data-theme='aurora-pearl'] input.bg-slate-950\/80:focus,
+html[data-theme='aurora-pearl'] input.bg-slate-900\/90:focus {
+  background-color: #ffffff;
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+}
+
+html[data-theme='aurora-pearl'] .shadow-inner {
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* 5. Backdrops de Modais, AlertDialogs e LoadingOverlay (vidro fumê escuro elegante) */
+html[data-theme='aurora-pearl'] .fixed.inset-0.bg-slate-950\/70 {
+  background-color: rgba(15, 23, 42, 0.35) !important;
+}
+
+html[data-theme='aurora-pearl'] .shadow-black\/70,
+html[data-theme='aurora-pearl'] .shadow-black\/50 {
+  --tw-shadow-color: rgba(15, 23, 42, 0.14);
+}
+
+/* 6. Tooltips de alto contraste estilo macOS / Linear */
+html[data-theme='aurora-pearl'] .topcast-tooltip-content {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 10px 25px -5px rgba(15, 23, 42, 0.22),
+    0 4px 10px -3px rgba(15, 23, 42, 0.12) !important;
+}
+
+/* 7. Tipografia e Hovers que usavam .text-white em superfícies claras */
+html[data-theme='aurora-pearl'] .text-white:not(.bg-primary):not(.bg-red-600):not(.bg-emerald-500),
+html[data-theme='aurora-pearl'] .hover\:text-white:hover:not(.bg-primary):not(.bg-red-600):not(.bg-emerald-500),
+html[data-theme='aurora-pearl'] .group:hover .group-hover\:text-white {
+  color: hsl(var(--foreground));
+}
+
+/* Preserva texto branco puro em botões sólidos e dentro do player de vídeo */
+html[data-theme='aurora-pearl'] .bg-primary.text-white,
+html[data-theme='aurora-pearl'] .bg-primary .text-white,
+html[data-theme='aurora-pearl'] .bg-red-600.text-white,
+html[data-theme='aurora-pearl'] .bg-red-600 .text-white,
+html[data-theme='aurora-pearl'] .bg-black .text-white,
+html[data-theme='aurora-pearl'] .bg-black .hover\:text-white:hover {
+  color: #ffffff;
+}
+
+/* Gradiente do título Hero na HomePage com contraste rico no modo claro */
+html[data-theme='aurora-pearl'] .from-blue-400.via-primary.to-blue-200 {
+  background-image: linear-gradient(135deg, #4338ca 0%, #6366f1 52%, #0284c7 100%) !important;
+}
+
+/* 8. Badges e Alertas Semânticos (Emerald, Amber, Red, Blue, Indigo) calibrados para fundo claro */
+html[data-theme='aurora-pearl'] .text-emerald-100,
+html[data-theme='aurora-pearl'] .text-emerald-200,
+html[data-theme='aurora-pearl'] .text-emerald-300,
+html[data-theme='aurora-pearl'] .text-emerald-400 {
+  color: #047857;
+}
+
+html[data-theme='aurora-pearl'] .bg-emerald-500\/10,
+html[data-theme='aurora-pearl'] .bg-emerald-500\/15 {
+  background-color: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.28);
+}
+
+html[data-theme='aurora-pearl'] .text-amber-100,
+html[data-theme='aurora-pearl'] .text-amber-200,
+html[data-theme='aurora-pearl'] .text-amber-300,
+html[data-theme='aurora-pearl'] .text-amber-400 {
+  color: #b45309;
+}
+
+html[data-theme='aurora-pearl'] .bg-amber-500\/10,
+html[data-theme='aurora-pearl'] .bg-amber-500\/15,
+html[data-theme='aurora-pearl'] .bg-amber-300\/\[0\.05\] {
+  background-color: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+html[data-theme='aurora-pearl'] .text-red-100,
+html[data-theme='aurora-pearl'] .text-red-200,
+html[data-theme='aurora-pearl'] .text-red-300,
+html[data-theme='aurora-pearl'] .text-red-400 {
+  color: #be123c;
+}
+
+html[data-theme='aurora-pearl'] .bg-red-500\/10,
+html[data-theme='aurora-pearl'] .bg-red-500\/15,
+html[data-theme='aurora-pearl'] .bg-red-400\/10 {
+  background-color: rgba(244, 63, 94, 0.10);
+  border-color: rgba(244, 63, 94, 0.25);
+}
+
+html[data-theme='aurora-pearl'] .text-blue-200,
+html[data-theme='aurora-pearl'] .text-blue-300,
+html[data-theme='aurora-pearl'] .text-blue-400 {
+  color: #4338ca;
+}
+
+html[data-theme='aurora-pearl'] .bg-blue-500\/15,
+html[data-theme='aurora-pearl'] .bg-blue-400\/10 {
+  background-color: rgba(79, 70, 229, 0.10);
+  border-color: rgba(79, 70, 229, 0.24);
+}
+
+html[data-theme='aurora-pearl'] .text-indigo-400 {
+  color: #4f46e5;
+}
+
+/* Restaura cores semânticas luminosas dentro do player de vídeo escuro (.bg-black) */
+html[data-theme='aurora-pearl'] .bg-black .text-emerald-300,
+html[data-theme='aurora-pearl'] .bg-black .text-emerald-400 {
+  color: #34d399;
+}
+
+html[data-theme='aurora-pearl'] .bg-black .text-amber-200,
+html[data-theme='aurora-pearl'] .bg-black .text-amber-300,
+html[data-theme='aurora-pearl'] .bg-black .text-amber-400 {
+  color: #fbbf24;
+}
+
+html[data-theme='aurora-pearl'] .bg-black .text-red-300,
+html[data-theme='aurora-pearl'] .bg-black .text-red-400 {
+  color: #f87171;
+}
+
+html[data-theme='aurora-pearl'] .bg-black .text-blue-300 {
+  color: #93c5fd;
+}
+
+/* 9. Ondas de fundo da HomePage mais suaves e translúcidas no modo claro */
+html[data-theme='aurora-pearl'] .animate-wave-1,
+html[data-theme='aurora-pearl'] .animate-wave-2,
+html[data-theme='aurora-pearl'] .animate-wave-3 {
+  opacity: 0.75;
 }
 
 /* Animações contínuas de ondas e iluminação ambiente (Design Profissional TopCast) */

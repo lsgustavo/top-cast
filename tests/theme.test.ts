@@ -41,8 +41,8 @@ describe('Theme Switcher', () => {
     } as unknown as Document;
   });
 
-  it('provides well-formed theme options with distinct primary colors', () => {
-    assert.ok(THEME_OPTIONS.length >= 6);
+  it('provides well-formed theme options with distinct primary colors including graphite and aurora-pearl', () => {
+    assert.ok(THEME_OPTIONS.length >= 8);
     const ids = new Set<string>();
     const primaryColors = new Set<string>();
 
@@ -59,20 +59,23 @@ describe('Theme Switcher', () => {
       ids.add(theme.id);
       primaryColors.add(theme.primaryColor);
     }
+
+    assert.ok(ids.has('graphite'));
+    assert.ok(ids.has('aurora-pearl'));
   });
 
-  it('defaults to midnight-violet when no theme is persisted', () => {
+  it('defaults to graphite when no theme is persisted', () => {
     assert.equal(getSavedTheme(), DEFAULT_THEME);
-    assert.equal(DEFAULT_THEME, 'midnight-violet');
+    assert.equal(DEFAULT_THEME, 'graphite');
   });
 
   it('persists and applies chosen theme to document.documentElement and localStorage', () => {
-    const targetTheme: ThemeId = 'cyber-blue';
+    const targetTheme: ThemeId = 'aurora-pearl';
     applyTheme(targetTheme);
 
-    assert.equal(document.documentElement.getAttribute('data-theme'), 'cyber-blue');
-    assert.equal(window.localStorage.getItem(THEME_STORAGE_KEY), 'cyber-blue');
-    assert.equal(getSavedTheme(), 'cyber-blue');
+    assert.equal(document.documentElement.getAttribute('data-theme'), 'aurora-pearl');
+    assert.equal(window.localStorage.getItem(THEME_STORAGE_KEY), 'aurora-pearl');
+    assert.equal(getSavedTheme(), 'aurora-pearl');
   });
 
   it('falls back to DEFAULT_THEME if stored theme id is invalid', () => {
@@ -80,4 +83,3 @@ describe('Theme Switcher', () => {
     assert.equal(getSavedTheme(), DEFAULT_THEME);
   });
 });
-

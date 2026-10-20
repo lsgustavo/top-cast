@@ -6,7 +6,7 @@ import RoomPage from './pages/RoomPage';
 import { createSignalingClient } from './lib/signaling-client';
 import type { RoomAvailability, RoomSnapshot, SignalingStatus } from '../shared/types/signaling';
 import { createRoom as requestRoomCreation, joinRoom as requestRoomJoin } from './lib/room-client';
-import { useRoomWebRtc } from './features/streaming/use-room-webrtc';
+import { getRoomPresenterId, useRoomWebRtc } from './features/streaming/use-room-webrtc';
 import { useScreenCapture } from './features/streaming/use-screen-capture';
 import { getReconnectIdentity, type ReconnectIdentity } from './lib/reconnect-identity';
 import { getParticipantChanges } from './lib/participant-events';
@@ -86,8 +86,8 @@ export default function App() {
   }, [room, screenCapture.stream, screenCapture.stopCapture]);
 
   useEffect(() => {
-    const self = room?.participants.find((participant) => participant.id === socket.id);
-    if (self?.role !== 'host' && screenCapture.stream) {
+    const activePresenterId = getRoomPresenterId(room);
+    if (activePresenterId !== socket.id && screenCapture.stream) {
       screenCapture.stopCapture();
     }
   }, [
