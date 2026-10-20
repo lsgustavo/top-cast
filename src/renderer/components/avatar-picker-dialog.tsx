@@ -94,7 +94,7 @@ export function AvatarPickerDialog({
                   }
                 }}
                 className={cn(
-                  'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/40 bg-slate-950/70 text-slate-400 shadow-sm transition-colors duration-150 hover:border-border/80 hover:bg-slate-800/70 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                  'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-950/70 text-slate-400 shadow-sm transition-colors duration-150 hover:bg-slate-800/70 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   triggerClassName,
                 )}
               >
@@ -109,12 +109,12 @@ export function AvatarPickerDialog({
       <DialogContent
         onMouseEnter={(e) => e.stopPropagation()}
         onMouseLeave={(e) => e.stopPropagation()}
-        className="max-w-md overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl backdrop-blur-xl"
+        className="max-w-md overflow-hidden rounded-2xl p-0 text-slate-100 glass-surface-elevated"
       >
-        <div className="border-b border-border/40 px-6 py-5">
+        <div className="border-b border-border/30 px-6 py-5">
           <DialogHeader className="text-left">
             <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary shadow-sm">
                 <Pencil className="h-4 w-4" />
               </span>
               <div>
@@ -131,9 +131,9 @@ export function AvatarPickerDialog({
 
         <div className="space-y-4 px-6 py-5">
           {/* Preview do avatar selecionado + botão gerar opções */}
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/40 bg-slate-950/60 p-3.5">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/25 bg-slate-900/40 p-3.5">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/50 bg-slate-900 shadow-inner">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-950/60 ring-1 ring-border/40">
                 <VoxelAvatar displayName={displayName || 'Você'} seed={selectedSeed} />
               </div>
               <div className="min-w-0">
@@ -151,7 +151,7 @@ export function AvatarPickerDialog({
               variant="outline"
               onClick={handleRandomizeOptions}
               aria-label="Gerar novas opções de avatar"
-              className="h-9 shrink-0 gap-2 rounded-xl border-border/40 bg-slate-900 px-3 text-xs font-medium text-slate-200 hover:border-primary/40 hover:bg-slate-800 hover:text-white"
+              className="h-9 shrink-0 gap-2 rounded-xl border border-border/30 bg-slate-900/60 px-3 text-xs font-medium text-slate-200 transition-colors hover:bg-slate-800 hover:text-white"
             >
               <Dice5 className="h-4 w-4 text-primary" />
               <span>Gerar novas opções</span>
@@ -181,8 +181,8 @@ export function AvatarPickerDialog({
                     className={cn(
                       'relative aspect-square overflow-hidden rounded-2xl border p-1.5 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                       isSelected
-                        ? 'border-primary bg-primary/15 shadow-sm'
-                        : 'border-border/40 bg-slate-950/60 hover:border-border/80 hover:bg-slate-900/80',
+                        ? 'border-primary bg-primary/20 shadow-sm ring-1 ring-primary/40'
+                        : 'border-border/25 bg-slate-900/40 hover:bg-slate-900/70 hover:border-border/40',
                     )}
                   >
                     <div className="h-full w-full overflow-hidden rounded-xl bg-slate-900 shadow-inner">
@@ -198,7 +198,7 @@ export function AvatarPickerDialog({
           </div>
         </div>
 
-        <div className="flex justify-end border-t border-border/40 bg-slate-950/40 px-6 py-4">
+        <div className="flex justify-end border-t border-border/30 bg-slate-950/40 px-6 py-4">
           <DialogFooter className="sm:justify-end">
             <Button
               type="button"

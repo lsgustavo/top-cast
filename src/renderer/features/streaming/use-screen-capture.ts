@@ -158,6 +158,7 @@ interface ScreenCaptureState {
   includeSystemAudio: boolean;
   hasSystemAudio: boolean;
   systemAudioEnabled: boolean;
+  isPaused: boolean;
   qualityPreset: StreamQualityPresetId;
   error: string | null;
 }
@@ -181,6 +182,7 @@ export function useScreenCapture() {
     includeSystemAudio: true,
     hasSystemAudio: false,
     systemAudioEnabled: false,
+    isPaused: false,
     qualityPreset: getSavedStreamQualityPreset(),
     error: null,
   }));
@@ -212,6 +214,7 @@ export function useScreenCapture() {
       isStartingCapture: false,
       hasSystemAudio: false,
       systemAudioEnabled: false,
+      isPaused: false,
     }));
   }, []);
 
@@ -258,7 +261,7 @@ export function useScreenCapture() {
       return true;
     }
 
-    const audioToInclude = supportsSystemAudio;
+    const audioToInclude = supportsSystemAudio && (includeSystemAudio ?? state.includeSystemAudio);
     setState((current) => ({ ...current, isPreparingSource: true, error: null }));
     try {
       const selection = await getScreenCaptureApi().selectSource(
@@ -302,11 +305,12 @@ export function useScreenCapture() {
       return false;
     }
 
+    const shouldCaptureAudio = supportsSystemAudio && state.includeSystemAudio;
     setState((current) => ({ ...current, isStartingCapture: true, error: null }));
     try {
       await getScreenCaptureApi().selectSource(
         state.preparedSourceId,
-        supportsSystemAudio,
+        shouldCaptureAudio,
       );
 
       const isWindow = state.preparedSourceId.startsWith('window:');
@@ -317,7 +321,7 @@ export function useScreenCapture() {
       let newProcessAudioController: ProcessAudioStreamController | null = null;
       let audioWarning: string | null = null;
 
-      if (supportsSystemAudio && (isWindow || isScreen)) {
+      if (shouldCaptureAudio && (isWindow || isScreen)) {
         try {
           newProcessAudioController = await createProcessAudioTrack(state.preparedSourceId);
         } catch (err) {
@@ -331,7 +335,7 @@ export function useScreenCapture() {
 
       // Se for tela inteira e o módulo WASAPI isolado já estiver ativo, não pede loopback bruto ao getDisplayMedia
       // para evitar vazamento ou duplicação de chamadas VoIP/Discord.
-      const requestDisplayLoopback = !isWindow && supportsSystemAudio && !newProcessAudioController;
+      const requestDisplayLoopback = !isWindow && shouldCaptureAudio && !newProcessAudioController;
 
       // Captura conforme o preset de qualidade selecionado (1080p 60 FPS por padrão)
       const videoConstraints = buildCaptureVideoConstraints(state.qualityPreset, isWindow);
@@ -408,6 +412,7 @@ export function useScreenCapture() {
             isStartingCapture: false,
             hasSystemAudio: false,
             systemAudioEnabled: false,
+            isPaused: false,
           }));
         }
       }, { once: true });
@@ -424,6 +429,7 @@ export function useScreenCapture() {
         isStartingCapture: false,
         hasSystemAudio: hasAudioAvailable,
         systemAudioEnabled: hasAudioAvailable,
+        isPaused: false,
         error: audioWarning,
       }));
       return true;
@@ -494,6 +500,35 @@ export function useScreenCapture() {
     setState((current) => ({ ...current, systemAudioEnabled: enabled }));
   }, []);
 
+  const setPaused = useCallback((paused: boolean) => {
+    setState((current) => {
+      const videoTracks = streamRef.current?.getVideoTracks() ?? [];
+      for (const track of videoTracks) {
+        track.enabled = !paused;
+      }
+
+      const effectiveAudioEnabled = !paused && current.systemAudioEnabled;
+      processAudioRef.current?.setEnabled(effectiveAudioEnabled);
+      broadcastMixRef.current?.setSystemAudioMuted(!effectiveAudioEnabled);
+
+      if (rawSystemTrackRef.current) {
+        rawSystemTrackRef.current.enabled = effectiveAudioEnabled;
+      }
+
+      const audioTracks = streamRef.current?.getAudioTracks() ?? [];
+      for (const track of audioTracks) {
+        if (!broadcastMixRef.current) {
+          track.enabled = effectiveAudioEnabled;
+        }
+      }
+
+      return {
+        ...current,
+        isPaused: paused,
+      };
+    });
+  }, []);
+
   useEffect(() => () => {
     broadcastMixRef.current?.stop();
     broadcastMixRef.current = null;
@@ -516,6 +551,7 @@ export function useScreenCapture() {
     stopCapture,
     setIncludeSystemAudio,
     setSystemAudioEnabled,
+    setPaused,
     setQualityPreset,
   };
 }

@@ -308,6 +308,7 @@ export default function App() {
         supportsSystemAudio={screenCapture.supportsSystemAudio}
         hasSystemAudio={screenCapture.hasSystemAudio}
         systemAudioEnabled={screenCapture.systemAudioEnabled}
+        isStreamPaused={screenCapture.isPaused}
         qualityPreset={screenCapture.qualityPreset}
         captureError={screenCapture.error}
         onLoadSources={screenCapture.loadSources}
@@ -317,6 +318,7 @@ export default function App() {
         onStartCapture={screenCapture.startCapture}
         onStopCapture={screenCapture.stopCapture}
         onToggleSystemAudio={screenCapture.setSystemAudioEnabled}
+        onSetStreamPaused={screenCapture.setPaused}
         getPeerConnections={getPeerConnections}
         onLeaveRequested={() => {
           reconnectIdentityRef.current = null;

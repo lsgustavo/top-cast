@@ -8,6 +8,8 @@ import {
   CircleAlert,
   Copy,
   Crown,
+  Eye,
+  EyeOff,
   Gauge,
   HelpCircle,
   Layers,
@@ -17,7 +19,11 @@ import {
   Minimize,
   Monitor,
   MonitorUp,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pause,
   PictureInPicture2,
+  Play,
   Radio,
   RefreshCw,
   RotateCcw,
@@ -92,6 +98,7 @@ interface RoomPageProps {
   supportsSystemAudio: boolean;
   hasSystemAudio: boolean;
   systemAudioEnabled: boolean;
+  isStreamPaused?: boolean;
   qualityPreset?: StreamQualityPresetId;
   captureError: string | null;
   onLoadSources: () => Promise<CaptureSource[]>;
@@ -101,6 +108,7 @@ interface RoomPageProps {
   onStartCapture: () => Promise<boolean>;
   onStopCapture: () => void;
   onToggleSystemAudio: (enabled: boolean) => void;
+  onSetStreamPaused?: (paused: boolean) => void;
   getPeerConnections?: () => Map<string, RTCPeerConnection>;
   onLeaveRequested: () => void;
   onLeave: () => void;
@@ -116,6 +124,10 @@ interface StreamVideoProps {
   hasSystemAudio?: boolean;
   systemAudioEnabled?: boolean;
   onToggleSystemAudio?: (enabled: boolean) => void;
+  isStreamPaused?: boolean;
+  onToggleStreamPause?: () => void;
+  isLocalPreviewHidden?: boolean;
+  onToggleLocalPreviewHidden?: () => void;
   isViewerDeafened?: boolean;
   onToggleViewerDeafen?: (deafened: boolean) => void;
   qualityPreset?: StreamQualityPresetId;
@@ -131,6 +143,10 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
     hasSystemAudio = false,
     systemAudioEnabled = true,
     onToggleSystemAudio,
+    isStreamPaused = false,
+    onToggleStreamPause,
+    isLocalPreviewHidden = false,
+    onToggleLocalPreviewHidden,
     isViewerDeafened = false,
     onToggleViewerDeafen,
     qualityPreset = '1080p60',
@@ -497,8 +513,73 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
         playsInline
         muted={isHost ? true : isMuted}
         onDoubleClick={() => void toggleFullscreen()}
-        className="max-h-full max-w-full h-auto w-auto m-auto bg-black object-contain cursor-pointer"
+        className={`max-h-full max-w-full h-auto w-auto m-auto bg-black object-contain cursor-pointer ${
+          isHost && isLocalPreviewHidden ? 'hidden' : ''
+        }`}
       />
+
+      {/* Card de Prévia Local Oculta (Fim do Espelho Infinito) */}
+      {isHost && isLocalPreviewHidden && !isStreamPaused && (
+        <div
+          data-local-preview-hidden-card
+          onClick={(e) => e.stopPropagation()}
+          className="relative z-20 mx-4 flex max-w-md flex-col items-center justify-center rounded-2xl border border-border/40 bg-slate-950/85 p-6 text-center shadow-2xl backdrop-blur-xl"
+        >
+          <div className="mb-3.5 grid h-12 w-12 place-items-center rounded-2xl border border-primary/25 bg-primary/10 text-primary shadow-sm">
+            <EyeOff className="h-6 w-6" />
+          </div>
+          <h3 className="text-sm font-semibold tracking-tight text-slate-100 sm:text-base">
+            Prévia local oculta
+          </h3>
+          <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
+            Sua tela continua sendo transmitida ao vivo para os participantes. A prévia local foi desativada para evitar o espelho infinito.
+          </p>
+          {onToggleLocalPreviewHidden && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onToggleLocalPreviewHidden}
+              className="mt-4 h-9 gap-2 rounded-xl border border-border/40 bg-slate-900/80 px-4 text-xs font-medium text-slate-200 shadow-sm transition-all hover:bg-slate-800 hover:text-white"
+            >
+              <Eye className="h-3.5 w-3.5 text-primary" />
+              <span>Mostrar prévia</span>
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Overlay de Transmissão Pausada (Modo Privacidade Rápido) */}
+      {isStreamPaused && (
+        <div
+          data-stream-paused-overlay
+          onClick={(e) => e.stopPropagation()}
+          className="absolute inset-0 z-25 flex flex-col items-center justify-center bg-slate-950/85 p-6 text-center backdrop-blur-xl"
+        >
+          <div className="mb-3.5 grid h-12 w-12 place-items-center rounded-2xl border border-amber-500/30 bg-amber-500/15 text-amber-300 shadow-sm">
+            <Pause className="h-6 w-6" />
+          </div>
+          <h3 className="text-sm font-semibold tracking-tight text-slate-100 sm:text-base">
+            Transmissão pausada
+          </h3>
+          <p className="mt-1.5 max-w-sm text-xs leading-relaxed text-slate-400">
+            {isHost
+              ? 'O envio de imagem e som da sua tela está pausado temporariamente. Nenhum conteúdo da sua tela está visível para a sala.'
+              : 'O transmissor pausou o compartilhamento de tela temporariamente. A imagem voltará em instantes.'}
+          </p>
+          {isHost && onToggleStreamPause && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={onToggleStreamPause}
+              className="mt-4 h-9 gap-2 rounded-xl bg-amber-500 px-4 text-xs font-semibold text-slate-950 shadow-sm transition-all hover:bg-amber-400"
+            >
+              <Play className="h-3.5 w-3.5 fill-current" />
+              <span>Retomar transmissão</span>
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* HUD de Estatísticas em Tempo Real ("Modo Nerd") */}
       {showStats && (
@@ -510,9 +591,9 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
             if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
             setShowControls(true);
           }}
-          className="absolute left-3.5 top-3.5 z-30 w-64 sm:w-72 rounded-2xl border border-white/10 bg-slate-950/85 p-3.5 text-xs text-slate-200 shadow-2xl backdrop-blur-xl"
+          className="absolute left-3.5 top-3.5 z-30 w-72 sm:w-80 rounded-2xl bg-slate-950/85 p-3.5 text-xs text-slate-200 shadow-2xl backdrop-blur-xl glass-surface-secondary"
         >
-          <div className="flex items-center justify-between border-b border-white/10 pb-2">
+          <div className="flex items-center justify-between border-b border-primary/15 pb-2.5">
             <div className="flex items-center gap-2">
               <Gauge className="h-3.5 w-3.5 text-primary" />
               <span className="font-semibold tracking-tight text-white">
@@ -530,47 +611,47 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
           </div>
 
           <dl className="mt-2.5 grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-white/5 bg-slate-900/70 px-2.5 py-2">
-              <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+            <div className="flex flex-col justify-between rounded-xl bg-slate-900/70 px-2.5 py-2 shadow-sm">
+              <dt className="truncate text-[10px] font-medium uppercase tracking-wider text-slate-400">
                 Resolução
               </dt>
-              <dd className="mt-0.5 flex items-center gap-1.5 font-mono text-xs font-semibold text-white">
-                <span>
+              <dd className="mt-1 flex items-center justify-between gap-1.5 whitespace-nowrap font-mono text-xs font-semibold text-white">
+                <span className="truncate">
                   {liveStats.width && liveStats.height
                     ? `${liveStats.width}×${liveStats.height}`
                     : '—'}
                 </span>
                 {liveStats.width && liveStats.height && (
-                  <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-semibold text-primary">
+                  <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-primary/15 px-1.5 py-0.5 font-sans text-[9px] font-semibold leading-none tracking-tight text-primary">
                     {formatResolutionBadge(liveStats.width, liveStats.height)}
                   </span>
                 )}
               </dd>
             </div>
 
-            <div className="rounded-xl border border-white/5 bg-slate-900/70 px-2.5 py-2">
-              <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+            <div className="flex flex-col justify-between rounded-xl bg-slate-900/70 px-2.5 py-2 shadow-sm">
+              <dt className="truncate text-[10px] font-medium uppercase tracking-wider text-slate-400">
                 Taxa de Quadros
               </dt>
-              <dd className="mt-0.5 font-mono text-xs font-semibold text-emerald-300">
+              <dd className="mt-1 whitespace-nowrap font-mono text-xs font-semibold text-emerald-300">
                 {liveStats.fps !== null ? `${liveStats.fps} FPS` : '—'}
               </dd>
             </div>
 
-            <div className="rounded-xl border border-white/5 bg-slate-900/70 px-2.5 py-2">
-              <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+            <div className="flex flex-col justify-between rounded-xl bg-slate-900/70 px-2.5 py-2 shadow-sm">
+              <dt className="truncate text-[10px] font-medium uppercase tracking-wider text-slate-400">
                 Bitrate {isHost ? '(Envio)' : '(Recepção)'}
               </dt>
-              <dd className="mt-0.5 font-mono text-xs font-semibold text-blue-300">
+              <dd className="mt-1 whitespace-nowrap font-mono text-xs font-semibold text-blue-300">
                 {liveStats.bitrateMbps !== null ? `${liveStats.bitrateMbps} Mbps` : 'Local'}
               </dd>
             </div>
 
-            <div className="rounded-xl border border-white/5 bg-slate-900/70 px-2.5 py-2">
-              <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+            <div className="flex flex-col justify-between rounded-xl bg-slate-900/70 px-2.5 py-2 shadow-sm">
+              <dt className="truncate text-[10px] font-medium uppercase tracking-wider text-slate-400">
                 Codec / Latência
               </dt>
-              <dd className="mt-0.5 font-mono text-xs font-semibold text-slate-100">
+              <dd className="mt-1 truncate whitespace-nowrap font-mono text-xs font-semibold text-slate-100">
                 {liveStats.codec ?? 'WebRTC'}
                 {liveStats.rttMs !== null ? ` · ${liveStats.rttMs} ms` : ''}
               </dd>
@@ -578,7 +659,7 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
           </dl>
 
           {!isHost && (liveStats.packetLossPercent !== null || liveStats.jitterMs !== null) && (
-            <div className="mt-2 flex items-center justify-between rounded-xl border border-white/5 bg-slate-900/50 px-2.5 py-1.5 text-[11px] text-slate-400">
+            <div className="mt-2 flex items-center justify-between rounded-xl bg-slate-900/50 px-2.5 py-1.5 text-[11px] text-slate-400">
               <span>
                 Perda:{' '}
                 <strong className="font-mono text-slate-200">
@@ -628,10 +709,10 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
               <div
                 key={participant.id}
                 data-immersive-participant-tile
-                className="group/tile relative flex w-36 sm:w-44 shrink-0 flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/75 p-3 shadow-xl backdrop-blur-xl transition-all duration-150 hover:border-primary/40 hover:bg-slate-900/90"
+                className="group/tile relative flex w-36 sm:w-44 shrink-0 flex-col items-center justify-center rounded-2xl bg-slate-950/75 p-3 shadow-xl backdrop-blur-xl transition-all duration-150 hover:bg-slate-900/90"
               >
                 <div className="relative mb-2">
-                  <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-slate-900 ring-1 ring-white/15 shadow-md">
+                  <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-slate-900 shadow-md">
                     <VoxelAvatar
                       displayName={participant.displayName}
                       seed={
@@ -683,19 +764,57 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
                 }}
                 aria-pressed={showStats}
                 aria-label="Alternar estatísticas da transmissão em tempo real"
-                className="flex items-center gap-1.5 rounded-full border border-red-500/25 bg-red-500/15 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-red-300 shadow-sm backdrop-blur-md transition-colors hover:border-red-400/40 hover:bg-red-500/25"
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide shadow-sm backdrop-blur-md transition-colors ${
+                  isStreamPaused
+                    ? 'border-amber-500/35 bg-amber-500/15 text-amber-300 hover:border-amber-400/50 hover:bg-amber-500/25'
+                    : 'border-red-500/25 bg-red-500/15 text-red-300 hover:border-red-400/40 hover:bg-red-500/25'
+                }`}
               >
                 <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                  {!isStreamPaused && (
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                  )}
+                  <span className={`relative inline-flex h-2 w-2 rounded-full ${isStreamPaused ? 'bg-amber-400' : 'bg-red-500'}`} />
                 </span>
-                <span>AO VIVO</span>
+                <span>{isStreamPaused ? 'PAUSADO' : 'AO VIVO'}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent side="top">
               Clique para {showStats ? 'ocultar' : 'ver'} estatísticas da transmissão
             </TooltipContent>
           </Tooltip>
+
+          {/* Botão de Pausar/Retomar transmissão para o Host no overlay flutuante */}
+          {isHost && onToggleStreamPause && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                onToggleStreamPause();
+                resetHideTimer();
+              }}
+              aria-pressed={isStreamPaused}
+              aria-label={isStreamPaused ? 'Retomar transmissão' : 'Pausar transmissão'}
+              className={`h-8 px-2.5 text-xs font-medium gap-1.5 rounded-xl border backdrop-blur-md transition-all ${
+                isStreamPaused
+                  ? 'border-amber-500/35 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+                  : 'border-border/40 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              {isStreamPaused ? (
+                <>
+                  <Play className="h-3.5 w-3.5 text-amber-300" />
+                  <span>Retomar</span>
+                </>
+              ) : (
+                <>
+                  <Pause className="h-3.5 w-3.5 text-slate-300" />
+                  <span>Pausar</span>
+                </>
+              )}
+            </Button>
+          )}
 
           {/* Botão de Mutar transmissão para o Host no overlay flutuante */}
           {isHost && hasSystemAudio && onToggleSystemAudio && (
@@ -768,8 +887,36 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
           )}
         </div>
 
-        {/* Direita: Seletor de Qualidade (Host), Estatísticas, Top Sounds, Picture-in-Picture e Tela Cheia */}
+        {/* Direita: Ocultar Prévia (Host), Seletor de Qualidade (Host), Estatísticas, Top Sounds, Picture-in-Picture e Tela Cheia */}
         <div className="flex items-center gap-2">
+          {/* Botão de Ocultar/Mostrar Prévia Local para o Host */}
+          {isHost && onToggleLocalPreviewHidden && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    onToggleLocalPreviewHidden();
+                    resetHideTimer();
+                  }}
+                  aria-pressed={isLocalPreviewHidden}
+                  aria-label={isLocalPreviewHidden ? 'Mostrar prévia local' : 'Ocultar prévia local'}
+                  className={`h-9 w-9 rounded-xl border backdrop-blur-md shadow-sm transition-colors ${
+                    isLocalPreviewHidden
+                      ? 'border-primary/50 bg-primary/20 text-primary'
+                      : 'border-border/40 bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-slate-100'
+                  }`}
+                >
+                  {isLocalPreviewHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {isLocalPreviewHidden ? 'Mostrar prévia local' : 'Ocultar prévia local'}
+              </TooltipContent>
+            </Tooltip>
+          )}
           {/* Seletor de Qualidade em Tempo Real para o Host */}
           {isHost && onSetQualityPreset && (
             <div className="relative">
@@ -957,14 +1104,17 @@ export default function RoomPage({
   supportsSystemAudio,
   hasSystemAudio,
   systemAudioEnabled,
+  isStreamPaused: isStreamPausedProp = false,
   qualityPreset = '1080p60',
   captureError,
   onLoadSources,
   onPrepareSource,
+  onSetIncludeSystemAudio,
   onSetQualityPreset,
   onStartCapture,
   onStopCapture,
   onToggleSystemAudio,
+  onSetStreamPaused,
   getPeerConnections,
   onLeaveRequested,
   onLeave,
@@ -987,6 +1137,10 @@ export default function RoomPage({
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(getSavedSidebarWidth);
   const [isStreamFullscreen, setIsStreamFullscreen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isLocalPreviewHidden, setIsLocalPreviewHidden] = useState(false);
+  const [isStreamPausedInternal, setIsStreamPausedInternal] = useState(false);
+  const [isRemoteStreamPaused, setIsRemoteStreamPaused] = useState(false);
   const [isViewerDeafened, setIsViewerDeafened] = useState(false);
   const connectionPing = useConnectionPing(socket, signalingStatus);
   const [isResizing, setIsResizing] = useState(false);
@@ -1092,8 +1246,11 @@ export default function RoomPage({
   const isPresenter = Boolean(selfParticipantId && activePresenterId === selfParticipantId);
   const remoteHostStream = presenter ? remoteStreams[presenter.id] ?? null : null;
   const presentationStream = isPresenter ? localStream : remoteHostStream;
+  const isStreamPaused = isPresenter
+    ? (isStreamPausedProp || isStreamPausedInternal)
+    : isRemoteStreamPaused;
   const isReceivingVideo = presentationStream !== null && (
-    isPresenter || presentationStream.getVideoTracks().some((track) => !track.muted && track.readyState === 'live')
+    isPresenter || isRemoteStreamPaused || presentationStream.getVideoTracks().some((track) => (!track.muted || isRemoteStreamPaused) && track.readyState === 'live')
   );
   const filteredSources = captureSources.filter((source) => source.kind === sourceKind);
   const signalingStatusLabels: Record<SignalingStatus, string> = {
@@ -1105,6 +1262,53 @@ export default function RoomPage({
   const isRoomConnected = signalingStatus === 'connected' && (
     room.participants.length <= 1 || rtcConnectedCount > 0
   );
+
+  useEffect(() => {
+    const handleStreamPaused = (payload: { fromParticipantId: string; paused: boolean }) => {
+      if (payload.fromParticipantId !== selfParticipantId) {
+        setIsRemoteStreamPaused(Boolean(payload.paused));
+      }
+    };
+    socket.on('room:stream-paused', handleStreamPaused);
+    return () => {
+      socket.off('room:stream-paused', handleStreamPaused);
+    };
+  }, [socket, selfParticipantId]);
+
+  useEffect(() => {
+    if (!presentationStream) {
+      setIsRemoteStreamPaused(false);
+      setIsStreamPausedInternal(false);
+    }
+  }, [presentationStream]);
+
+  // Atalho 'T' para alternar Modo Teatro (recolher/expandir sidebar)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        setIsSidebarCollapsed((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleToggleStreamPause = () => {
+    if (!isPresenter) return;
+    const nextPaused = !isStreamPaused;
+    setIsStreamPausedInternal(nextPaused);
+    onSetStreamPaused?.(nextPaused);
+    if (localStream) {
+      for (const track of localStream.getVideoTracks()) {
+        track.enabled = !nextPaused;
+      }
+    }
+    socket.emit('room:stream-paused', { paused: nextPaused });
+  };
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 15_000);
@@ -1412,27 +1616,36 @@ export default function RoomPage({
         style={{
           ['--sidebar-width' as string]: `${sidebarWidth}px`,
         }}
-        className={`relative z-10 flex w-full shrink-0 flex-col border-b border-border/40 bg-slate-950/70 backdrop-blur-xl p-4 sm:p-5 lg:h-screen lg:min-h-0 lg:w-[var(--sidebar-width)] lg:border-b-0 lg:border-r shadow-lg ${
-          isResizing ? 'transition-none select-none' : 'transition-[width] duration-150 ease-out'
-        } ${isStreamFullscreen ? 'hidden' : ''}`}
+        className={`relative z-10 flex w-full shrink-0 flex-col border-b border-border/40 bg-slate-950/70 backdrop-blur-xl lg:h-screen lg:min-h-0 lg:border-b-0 lg:border-r border-border/40 shadow-2xl glass-surface-primary ${
+          isResizing
+            ? 'transition-none select-none'
+            : 'transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
+        } ${
+          isStreamFullscreen
+            ? 'hidden'
+            : isSidebarCollapsed
+              ? 'h-0 max-h-0 p-0 border-b-0 opacity-0 pointer-events-none select-none overflow-hidden lg:h-screen lg:max-h-none lg:w-0 lg:min-w-0 lg:max-w-0 lg:border-r-0 lg:p-0 lg:opacity-0 lg:-translate-x-2'
+              : 'p-4 sm:p-5 opacity-100 lg:w-[var(--sidebar-width)] lg:opacity-100 lg:translate-x-0'
+        }`}
       >
-        <div className="flex items-center gap-3 border-b border-border/40 pb-4 [-webkit-app-region:drag]">
-          <div className="grid h-10 w-10 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
-            <Radio className="h-5 w-5" />
+        <div className="flex h-full w-full min-w-0 flex-col overflow-x-hidden">
+          <div className="flex items-center gap-3 border-b border-primary/15 pb-4 [-webkit-app-region:drag]">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary shadow-sm">
+              <Radio className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-semibold tracking-tight text-slate-100">TopCast</h1>
+              <p className="mt-0.5 text-xs text-slate-400">Sala de transmissão</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold tracking-tight text-slate-100">TopCast</h1>
-            <p className="mt-0.5 text-xs text-slate-400">Sala de transmissão</p>
-          </div>
-        </div>
 
         {/* Card do Convite */}
-        <section aria-label="Convite da sala" className="mt-3.5 rounded-xl border border-border/40 bg-slate-900/40 backdrop-blur-md p-3.5 shadow-sm">
+        <section aria-label="Convite da sala" className="mt-3.5 w-full min-w-0 rounded-xl border border-border/25 bg-slate-900/40 p-3">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Convite</h2>
             <span className="text-[11px] font-medium text-slate-400">Expira em {formatRoomTimeRemaining(room.expiresAt, now)}</span>
           </div>
-          <div className="mt-2.5 flex items-center gap-2 rounded-lg border border-border/30 bg-slate-950/60 p-1.5 pl-2.5 shadow-inner">
+          <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-slate-950/60 p-1.5 pl-2.5">
             <span className="min-w-0 flex-1 truncate font-mono text-sm font-bold tracking-widest text-blue-200">{room.inviteCode}</span>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -1456,12 +1669,12 @@ export default function RoomPage({
         </section>
 
         {/* Lista de Participantes */}
-        <section aria-labelledby="participants-heading" className="mt-4 flex min-h-24 flex-1 flex-col lg:min-h-0">
+        <section aria-labelledby="participants-heading" className="mt-4 flex min-h-24 w-full min-w-0 flex-1 flex-col overflow-hidden lg:min-h-0">
           <div className="flex items-center justify-between border-b border-border/40 pb-2">
             <h2 id="participants-heading" className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Participantes</h2>
             <span className="text-[12px] tabular-nums text-slate-400">{room.participants.length}/{room.maxParticipants}</span>
           </div>
-          <ul className="mt-2.5 flex flex-col gap-1.5 overflow-y-auto pr-0.5">
+          <ul className="mt-2.5 flex flex-col gap-1.5 overflow-y-auto overflow-x-hidden pr-0.5">
             {room.participants.map((participant) => {
               const isSelf = participant.id === selfParticipantId;
               const presenceColor = participant.presence === 'available'
@@ -1484,10 +1697,10 @@ export default function RoomPage({
                       setParticipantToKick({ id: participant.id, displayName: participant.displayName });
                     }
                   }}
-                  className={`group flex items-center justify-between gap-2.5 rounded-xl border border-border/30 bg-slate-900/40 backdrop-blur-sm p-2.5 transition-all duration-150 ${
+                  className={`group flex w-full min-w-0 items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 transition-colors ${
                     canKickThisParticipant
-                      ? 'cursor-pointer hover:border-border/60 hover:bg-slate-800/70'
-                      : ''
+                      ? 'cursor-pointer hover:bg-slate-900/60'
+                      : 'hover:bg-slate-900/40'
                   }`}
                   role={canKickThisParticipant ? 'button' : undefined}
                   tabIndex={canKickThisParticipant ? 0 : undefined}
@@ -1507,7 +1720,7 @@ export default function RoomPage({
                     {/* Avatar com status badge */}
                     <div className="relative shrink-0">
                       <div
-                        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-slate-950/80 ring-1 ring-border/50 shadow-sm"
+                        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-slate-950/80 shadow-sm"
                         role="img"
                         aria-label={`${participant.displayName}, ${presenceLabel}`}
                       >
@@ -1571,7 +1784,7 @@ export default function RoomPage({
             })}
           </ul>
           {participantActionError && (
-            <p role="alert" className="mt-2.5 inline-flex w-fit max-w-full self-start items-start gap-2 break-words rounded-xl border border-red-500/20 bg-red-400/10 px-3 py-2 text-xs leading-5 text-red-200">
+            <p role="alert" className="mt-2.5 inline-flex w-fit max-w-full self-start items-start gap-2 break-words rounded-xl border border-red-500/20 bg-red-400/10 px-3 py-2 text-xs leading-5 text-red-200 topcast-alert-animate">
               <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {participantActionError}
             </p>
@@ -1579,10 +1792,10 @@ export default function RoomPage({
         </section>
 
         {/* Status da Conexão & Áudio */}
-        <div className="relative z-40 mt-4 border-t border-border/40 pt-3 lg:mt-3">
+        <div className="relative z-40 mt-4 w-full min-w-0 border-t border-border/30 pt-3 lg:mt-3">
           <section
             aria-label="Status da conexão e transmissão"
-            className="relative z-40 rounded-xl border border-border/40 bg-slate-900/50 backdrop-blur-md p-3.5 shadow-sm"
+            className="relative z-40 w-full min-w-0 rounded-xl border border-border/25 bg-slate-900/40 p-3"
           >
             {/* Header: Sinalização com o Status da Conexão */}
             <div className="flex items-center justify-between gap-3 py-1">
@@ -1816,7 +2029,7 @@ export default function RoomPage({
                       aria-haspopup="listbox"
                       aria-expanded={presenceSelectOpen}
                       aria-label={`Alterar status de ${participant.displayName}. Status atual: ${presenceLabel}`}
-                      className="group flex w-full items-center gap-2.5 rounded-xl border border-border/40 bg-slate-900/50 p-2 shadow-sm backdrop-blur-md transition-all duration-150 hover:border-border/70 hover:bg-slate-900/80 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="group flex w-full items-center gap-2.5 rounded-xl border border-border/25 bg-slate-900/40 p-2 text-left transition-colors hover:bg-slate-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       <div className="relative shrink-0" aria-hidden="true">
                         <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-slate-950/80 ring-1 ring-border/50 shadow-sm">
@@ -1937,6 +2150,7 @@ export default function RoomPage({
                 );
               })}
           </div>
+          </div>
         </div>
 
         {/* Separador de redimensionamento da sidebar */}
@@ -1956,7 +2170,9 @@ export default function RoomPage({
               onPointerCancel={handleResizeEnd}
               onDoubleClick={handleResetSidebarWidth}
               onKeyDown={handleResizeKeyDown}
-              className="group absolute -right-1.5 top-0 bottom-0 z-20 hidden w-3 cursor-col-resize select-none touch-none lg:block focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              className={`group absolute -right-1.5 top-0 bottom-0 z-20 w-3 cursor-col-resize select-none touch-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                isSidebarCollapsed ? 'hidden' : 'hidden lg:block'
+              }`}
             >
               <div
                 className={`mx-auto h-full w-[2px] transition-colors duration-150 ${
@@ -1974,11 +2190,39 @@ export default function RoomPage({
       </aside>
 
       {/* Área Principal */}
-      <div className={`relative mx-auto flex min-h-full w-full flex-1 flex-col ${isStreamFullscreen ? 'max-w-none p-0' : 'max-w-[1600px] px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5'}`}>
+      <div className={`relative mx-auto flex min-h-full w-full flex-1 flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isStreamFullscreen ? 'max-w-none p-0' : `${isSidebarCollapsed ? 'max-w-none' : 'max-w-[1600px]'} px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5`}`}>
         <header className={`flex shrink-0 items-center justify-between gap-4 border-b border-border/40 pb-4 [-webkit-app-region:drag] ${isStreamFullscreen ? 'hidden' : ''}`}>
-          <div>
-            <h2 className="text-base font-semibold tracking-tight text-slate-100">Sala de transmissão</h2>
-            <p className="mt-0.5 text-xs text-slate-400">{isPresenter ? 'Compartilhe sua tela com a sala' : 'Acompanhe a transmissão'}</p>
+          <div className="flex items-center gap-3">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                  aria-pressed={isSidebarCollapsed}
+                  aria-label={isSidebarCollapsed ? 'Expandir barra lateral' : 'Modo Teatro (recolher barra lateral)'}
+                  className={`h-9 w-9 shrink-0 rounded-xl border transition-colors [-webkit-app-region:no-drag] ${
+                    isSidebarCollapsed
+                      ? 'border-primary/40 bg-primary/15 text-primary hover:bg-primary/25'
+                      : 'border-border/40 bg-slate-900/60 text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                  }`}
+                >
+                  {isSidebarCollapsed ? (
+                    <PanelLeftOpen className="h-4 w-4" />
+                  ) : (
+                    <PanelLeftClose className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {isSidebarCollapsed ? 'Expandir barra lateral (T)' : 'Modo Teatro: Recolher barra lateral (T)'}
+              </TooltipContent>
+            </Tooltip>
+            <div>
+              <h2 className="text-base font-semibold tracking-tight text-slate-100">Sala de transmissão</h2>
+              <p className="mt-0.5 text-xs text-slate-400">{isPresenter ? 'Compartilhe sua tela com a sala' : 'Acompanhe a transmissão'}</p>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 [-webkit-app-region:no-drag]">
             {onOpenWelcome && (
@@ -2177,6 +2421,58 @@ export default function RoomPage({
                                   type="button"
                                   variant="ghost"
                                   size="sm"
+                                  aria-pressed={isLocalPreviewHidden}
+                                  aria-label={isLocalPreviewHidden ? 'Mostrar prévia local' : 'Ocultar prévia local'}
+                                  onClick={() => setIsLocalPreviewHidden((prev) => !prev)}
+                                  className={`h-9 gap-2 rounded-xl border px-3.5 text-xs font-medium shadow-sm transition-all ${
+                                    isLocalPreviewHidden
+                                      ? 'border-primary/40 bg-primary/15 text-primary hover:bg-primary/25'
+                                      : 'border-border/40 bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-slate-100'
+                                  }`}
+                                >
+                                  {isLocalPreviewHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                                  <span>{isLocalPreviewHidden ? 'Mostrar prévia' : 'Ocultar prévia'}</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                {isLocalPreviewHidden
+                                  ? 'Voltar a exibir a prévia da sua tela no player'
+                                  : 'Ocultar prévia local para evitar o efeito de espelho infinito'}
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-pressed={isStreamPaused}
+                                  aria-label={isStreamPaused ? 'Retomar transmissão' : 'Pausar transmissão'}
+                                  onClick={handleToggleStreamPause}
+                                  className={`h-9 gap-2 rounded-xl border px-3.5 text-xs font-medium shadow-sm transition-all ${
+                                    isStreamPaused
+                                      ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+                                      : 'border-border/40 bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-slate-100'
+                                  }`}
+                                >
+                                  {isStreamPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                                  <span>{isStreamPaused ? 'Retomar' : 'Pausar'}</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                {isStreamPaused
+                                  ? 'Retomar envio de imagem e som da sua tela'
+                                  : 'Pausar temporariamente a transmissão (modo privacidade)'}
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={openSourcePicker}
                                   className="h-9 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-3.5 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100"
                                 >
@@ -2247,6 +2543,10 @@ export default function RoomPage({
                       hasSystemAudio={hasSystemAudio}
                       systemAudioEnabled={systemAudioEnabled}
                       onToggleSystemAudio={onToggleSystemAudio}
+                      isStreamPaused={isStreamPaused}
+                      onToggleStreamPause={isPresenter ? handleToggleStreamPause : undefined}
+                      isLocalPreviewHidden={isLocalPreviewHidden}
+                      onToggleLocalPreviewHidden={isPresenter ? () => setIsLocalPreviewHidden((prev) => !prev) : undefined}
                       isViewerDeafened={isViewerDeafened}
                       onToggleViewerDeafen={setIsViewerDeafened}
                       qualityPreset={qualityPreset}
@@ -2384,7 +2684,7 @@ export default function RoomPage({
               )}
 
               {captureError && isPresenter && !isSourcePickerOpen && (
-                <p role="alert" className="mx-auto mt-4 inline-flex w-fit max-w-full items-start gap-2 break-words rounded-xl border border-red-500/20 bg-red-400/10 px-3.5 py-2.5 text-sm text-red-200">
+                <p role="alert" className="mx-auto mt-4 inline-flex w-fit max-w-full items-start gap-2 break-words rounded-xl border border-red-500/20 bg-red-400/10 px-3.5 py-2.5 text-sm text-red-200 topcast-alert-animate">
                   <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
                   {captureError}
                 </p>
@@ -2396,7 +2696,7 @@ export default function RoomPage({
 
       {/* Modal de Seleção de Tela / Janela com Glass Styling */}
       <Dialog open={isSourcePickerOpen} onOpenChange={(open) => !open && closeSourcePicker()}>
-        <DialogContent className="flex max-h-[88vh] w-full max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl backdrop-blur-xl sm:max-w-4xl">
+        <DialogContent className="flex max-h-[88vh] w-full max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl backdrop-blur-xl sm:max-w-4xl glass-surface-elevated">
           <DialogHeader className="border-b border-border/40 px-6 py-5 text-left">
             <div className="flex items-center gap-3.5 pr-8">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
@@ -2477,7 +2777,7 @@ export default function RoomPage({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             {captureError && (
-              <p role="alert" className="mb-4 flex w-fit max-w-full items-start gap-2.5 break-words rounded-xl border border-red-500/20 bg-red-400/10 px-3.5 py-3 text-sm leading-5 text-red-200">
+              <p role="alert" className="mb-4 flex w-fit max-w-full items-start gap-2.5 break-words rounded-xl border border-red-500/20 bg-red-400/10 px-3.5 py-3 text-sm leading-5 text-red-200 topcast-alert-animate">
                 <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
                 {captureError}
               </p>
@@ -2552,33 +2852,70 @@ export default function RoomPage({
           </div>
 
           <div className="flex flex-col-reverse gap-3 border-t border-border/40 bg-slate-950/40 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-slate-400">Qualidade:</span>
-              <div
-                role="radiogroup"
-                aria-label="Qualidade da transmissão"
-                className="inline-flex rounded-xl border border-border/40 bg-slate-950/70 p-1"
-              >
-                {STREAM_QUALITY_PRESET_LIST.map((preset) => {
-                  const isActive = qualityPreset === preset.id;
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={isActive}
-                      onClick={() => onSetQualityPreset?.(preset.id)}
-                      className={`inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
-                      }`}
-                    >
-                      <span>{preset.shortLabel}</span>
-                    </button>
-                  );
-                })}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-400">Qualidade:</span>
+                <div
+                  role="radiogroup"
+                  aria-label="Qualidade da transmissão"
+                  className="inline-flex rounded-xl border border-border/40 bg-slate-950/70 p-1"
+                >
+                  {STREAM_QUALITY_PRESET_LIST.map((preset) => {
+                    const isActive = qualityPreset === preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={isActive}
+                        onClick={() => onSetQualityPreset?.(preset.id)}
+                        className={`inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors ${
+                          isActive
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{preset.shortLabel}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {supportsSystemAudio && (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={includeSystemAudio}
+                  aria-label="Compartilhar áudio do sistema"
+                  onClick={() => {
+                    onSetIncludeSystemAudio?.(!includeSystemAudio);
+                  }}
+                  className={`inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-medium transition-all ${
+                    includeSystemAudio
+                      ? 'border-primary/40 bg-primary/15 text-slate-100 shadow-sm hover:bg-primary/20'
+                      : 'border-border/40 bg-slate-950/70 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                  }`}
+                >
+                  {includeSystemAudio ? (
+                    <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
+                  ) : (
+                    <VolumeX className="h-3.5 w-3.5 text-slate-400" />
+                  )}
+                  <span>Áudio do sistema</span>
+                  <span
+                    className={`ml-0.5 inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors ${
+                      includeSystemAudio ? 'bg-primary' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+                        includeSystemAudio ? 'translate-x-3' : 'translate-x-0'
+                      }`}
+                    />
+                  </span>
+                </button>
+              )}
             </div>
             <div className="flex justify-end gap-2.5">
               <Button type="button" variant="ghost" onClick={closeSourcePicker}>
@@ -2683,7 +3020,7 @@ export default function RoomPage({
         <div
           role={toastTone === 'error' ? 'alert' : 'status'}
           aria-live={toastTone === 'error' ? 'assertive' : 'polite'}
-          className={`fixed right-4 top-4 z-[90] flex w-fit max-w-[min(24rem,calc(100vw-2rem))] items-start gap-2.5 break-words rounded-xl border border-border/40 bg-slate-900/90 px-4 py-3 text-sm shadow-xl backdrop-blur-xl sm:right-6 sm:top-6 ${
+          className={`fixed right-4 top-4 z-[90] flex w-fit max-w-[min(24rem,calc(100vw-2rem))] items-start gap-2.5 break-words rounded-xl border border-border/40 bg-slate-900/90 px-4 py-3 text-sm shadow-xl backdrop-blur-xl sm:right-6 sm:top-6 topcast-toast-animate glass-surface-elevated ${
             toastTone === 'error'
               ? 'text-red-100 shadow-red-950/20'
               : 'text-slate-100'

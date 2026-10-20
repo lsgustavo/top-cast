@@ -77,8 +77,8 @@ export default function CreateRoomPage({
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(hsl(var(--primary))_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.025]"
       />
 
-      {/* Card da Tela Intermediária com Design Moderno e Glassmorphism */}
-      <section className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-border/40 bg-slate-900/85 p-6 shadow-2xl backdrop-blur-2xl sm:p-8">
+      {/* Card da Tela Intermediária com Design Moderno e Soft Glass */}
+      <section className="relative w-full max-w-lg overflow-hidden rounded-3xl p-6 sm:p-8 glass-surface-elevated">
         {/* Barra superior com botão Voltar e indicador de Sessão */}
         <div className="relative z-10 mb-6 flex items-center justify-between">
           <Button
@@ -102,7 +102,7 @@ export default function CreateRoomPage({
         {/* Cabeçalho Principal */}
         <div className="relative z-10">
           <div className="flex items-center gap-3.5">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary shadow-sm">
               <Radio className="h-6 w-6" />
             </div>
             <div>
@@ -121,8 +121,8 @@ export default function CreateRoomPage({
         </div>
 
         {/* Card do Anfitrião com Avatar Voxel e Identidade */}
-        <div className="relative z-10 mt-5 flex items-center gap-3.5 rounded-2xl border border-border/40 bg-slate-950/50 p-3.5 backdrop-blur-md">
-          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-border/40 shadow-inner ring-1 ring-border/50">
+        <div className="relative z-10 mt-5 flex items-center gap-3.5 rounded-2xl border border-border/25 bg-slate-900/40 p-3.5">
+          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl ring-1 ring-border/50">
             <VoxelAvatar displayName={displayName} seed={avatarSeed} />
           </div>
           <div className="min-w-0 flex-1">
@@ -133,14 +133,14 @@ export default function CreateRoomPage({
               {displayName}
             </span>
           </div>
-          <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
             Host
           </span>
         </div>
 
         {/* Grid de Especificações da Sala */}
         <div className="relative z-10 mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-border/40 bg-slate-950/40 p-3.5 backdrop-blur-sm transition-colors hover:border-border/60 hover:bg-slate-950/60">
+          <div className="rounded-2xl border border-border/25 bg-slate-900/40 p-3.5 transition-colors hover:bg-slate-900/60">
             <div className="flex items-center gap-2 text-slate-400">
               <Users className="h-4 w-4 text-primary" />
               <span className="text-xs font-medium">Capacidade</span>
@@ -149,7 +149,7 @@ export default function CreateRoomPage({
             <p className="mt-0.5 text-[11px] text-slate-400">Assistindo ao vivo</p>
           </div>
 
-          <div className="rounded-2xl border border-border/40 bg-slate-950/40 p-3.5 backdrop-blur-sm transition-colors hover:border-border/60 hover:bg-slate-950/60">
+          <div className="rounded-2xl border border-border/25 bg-slate-900/40 p-3.5 transition-colors hover:bg-slate-900/60">
             <div className="flex items-center gap-2 text-slate-400">
               <Clock className="h-4 w-4 text-primary" />
               <span className="text-xs font-medium">Validade</span>

@@ -155,12 +155,12 @@ export function TopSoundsDropdown({
               setIsOpen((prev) => !prev);
             }}
             className={cn(
-              'relative rounded-xl border transition-all duration-150 focus-visible:ring-primary',
+              'relative rounded-xl transition-all duration-150 focus-visible:ring-primary',
               triggerSize === 'sm' ? 'h-8 px-2' : 'h-9 px-2.5',
               !showLabel && (triggerSize === 'sm' ? 'w-8 p-0' : 'w-9 p-0'),
               isOpen || anyPlaying
-                ? 'border-primary/50 bg-primary/20 text-primary hover:bg-primary/25'
-                : 'border-border/40 bg-slate-900/60 text-slate-300 backdrop-blur-md hover:border-border/70 hover:bg-slate-800 hover:text-slate-100',
+                ? 'bg-primary/20 text-primary hover:bg-primary/25'
+                : 'bg-slate-900/60 text-slate-300 backdrop-blur-md hover:bg-slate-800 hover:text-slate-100',
               triggerClassName,
             )}
           >
@@ -191,7 +191,7 @@ export function TopSoundsDropdown({
           onPointerUp={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           className={cn(
-            'absolute z-[100] w-72 sm:w-80 overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-3 text-slate-100 shadow-2xl backdrop-blur-xl animate-in fade-in-0 zoom-in-95 duration-150 ease-out select-none',
+            'absolute z-[100] w-72 sm:w-80 overflow-hidden rounded-2xl p-3 text-slate-100 select-none glass-surface-elevated animate-in fade-in-0 zoom-in-95 duration-150 ease-out',
             getPlacementClasses(),
           )}
         >
@@ -231,7 +231,7 @@ export function TopSoundsDropdown({
           {showVolumeControl && (
             <div
               onClick={(e) => e.stopPropagation()}
-              className="mb-2.5 rounded-xl border border-border/30 bg-slate-950/50 p-2.5 animate-in fade-in-0 duration-150"
+              className="mb-2.5 rounded-xl border border-border/25 bg-slate-900/40 p-2.5 animate-in fade-in-0 duration-150"
             >
               <div className="flex items-center justify-between mb-1.5 text-[11px] text-slate-400">
                 <span>Volume</span>
@@ -263,8 +263,8 @@ export function TopSoundsDropdown({
                   className={cn(
                     'group relative flex items-center gap-2 rounded-xl border p-2.5 text-left transition-all select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                     isPlaying
-                      ? 'border-primary/60 bg-primary/20 text-primary shadow-sm ring-1 ring-primary/40 active:scale-95'
-                      : 'border-border/30 bg-slate-800/80 text-slate-200 hover:border-border/60 hover:bg-slate-700/80 hover:text-white active:scale-95 shadow-sm',
+                      ? 'border-primary/50 bg-primary/20 text-primary shadow-sm active:scale-95'
+                      : 'border-border/25 bg-slate-900/40 text-slate-200 hover:border-border/40 hover:bg-slate-900/70 hover:text-white active:scale-95 transition-colors',
                   )}
                 >
                   {/* Emoji do som */}

@@ -42,8 +42,7 @@ const SelectContent = ({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       className={cn(
-        'z-[85] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-border/40 bg-slate-900/95 p-1 text-slate-200 shadow-2xl backdrop-blur-xl outline-none transition-all duration-200',
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
+        'z-[85] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl bg-slate-950/85 p-1 text-slate-200 shadow-2xl backdrop-blur-xl outline-none topcast-select-content glass-surface-elevated',
         className,
       )}
       {...props}

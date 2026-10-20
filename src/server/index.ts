@@ -409,6 +409,19 @@ io.on('connection', (socket) => {
     });
   });
 
+  socket.on('room:stream-paused', (payload) => {
+    if (!socket.data.roomId || socket.data.participantId !== socket.id) {
+      return;
+    }
+    if (!payload || typeof payload.paused !== 'boolean') {
+      return;
+    }
+    socket.to(socket.data.roomId).emit('room:stream-paused', {
+      fromParticipantId: socket.id,
+      paused: payload.paused,
+    });
+  });
+
   socket.on('disconnect', (reason) => {
     const result = roomService.leave(socket.id, Date.now(), true);
     if (result?.roomClosed) {

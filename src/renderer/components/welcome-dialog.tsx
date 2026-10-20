@@ -60,7 +60,7 @@ export function WelcomeDialog({ open, onOpenChange }: WelcomeDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl overflow-hidden rounded-3xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl backdrop-blur-2xl">
+      <DialogContent className="max-w-2xl overflow-hidden rounded-3xl p-0 text-slate-100 glass-surface-elevated">
         <div className="relative w-full overflow-hidden">
           {/* Luz ambiente superior suave */}
           <div
@@ -84,8 +84,8 @@ export function WelcomeDialog({ open, onOpenChange }: WelcomeDialogProps) {
           <div className="relative z-10 px-6 py-3 sm:px-8">
             <div className="grid gap-3">
               {/* Card 1: Compartilhar Tela ou Janela */}
-              <div className="group relative flex items-start gap-4 rounded-2xl border border-border/40 bg-slate-950/40 p-4 backdrop-blur-sm transition-all duration-150 hover:border-border/70 hover:bg-slate-950/70">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+              <div className="group relative flex items-start gap-4 rounded-2xl border border-border/25 bg-slate-900/40 p-4 transition-colors hover:bg-slate-900/60">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                   <Monitor className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -99,8 +99,8 @@ export function WelcomeDialog({ open, onOpenChange }: WelcomeDialogProps) {
               </div>
 
               {/* Card 2: Áudio do Sistema Integrado */}
-              <div className="group relative flex items-start gap-4 rounded-2xl border border-border/40 bg-slate-950/40 p-4 backdrop-blur-sm transition-all duration-150 hover:border-border/70 hover:bg-slate-950/70">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+              <div className="group relative flex items-start gap-4 rounded-2xl border border-border/25 bg-slate-900/40 p-4 transition-colors hover:bg-slate-900/60">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                   <Volume2 className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -114,8 +114,8 @@ export function WelcomeDialog({ open, onOpenChange }: WelcomeDialogProps) {
               </div>
 
               {/* Card 3: Convite P2P Instantâneo */}
-              <div className="group relative flex items-start gap-4 rounded-2xl border border-border/40 bg-slate-950/40 p-4 backdrop-blur-sm transition-all duration-150 hover:border-border/70 hover:bg-slate-950/70">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+              <div className="group relative flex items-start gap-4 rounded-2xl border border-border/25 bg-slate-900/40 p-4 transition-colors hover:bg-slate-900/60">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                   <Users className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -131,7 +131,7 @@ export function WelcomeDialog({ open, onOpenChange }: WelcomeDialogProps) {
           </div>
 
           {/* Rodapé com Checkbox e Botão */}
-          <div className="relative z-10 mt-3 flex flex-col items-center justify-between gap-4 border-t border-border/40 bg-slate-950/30 px-6 py-5 sm:flex-row sm:px-8">
+          <div className="relative z-10 mt-3 flex flex-col items-center justify-between gap-4 border-t border-border/30 bg-slate-950/40 px-6 py-5 sm:flex-row sm:px-8">
             <label className="group flex cursor-pointer items-center gap-2.5 text-xs text-slate-400 transition-colors select-none hover:text-slate-200">
               <span
                 onClick={() => setDontShowAgain(!dontShowAgain)}

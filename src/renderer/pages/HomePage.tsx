@@ -272,14 +272,14 @@ export default function HomePage({
         </section>
 
         {/* Perfil do Usuário com Efeito Glass */}
-        <div className="mt-7 rounded-2xl border border-border/40 bg-slate-900/50 p-4 shadow-md backdrop-blur-xl">
+        <div className="mt-7 rounded-2xl p-4 glass-surface-secondary">
           <label htmlFor="display-name" className="mb-2.5 block text-left text-xs font-semibold uppercase tracking-wider text-slate-300">
             Seu Perfil
           </label>
           <div className="flex items-center gap-3">
             {/* Avatar DiceBear Voxel Art */}
             <div
-              className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/40 bg-slate-950/80 shadow-inner ring-1 ring-border/50"
+              className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-950/60 ring-1 ring-border/40"
               aria-label={`Avatar de ${displayName || 'Você'}`}
             >
               <VoxelAvatar displayName={displayName || 'Você'} seed={avatarSeed} />
@@ -302,7 +302,7 @@ export default function HomePage({
                 value={displayName}
                 onChange={(event) => onDisplayNameChange(event.currentTarget.value)}
                 placeholder="Como as pessoas devem chamar você?"
-                className="h-11 w-full rounded-xl border border-border/40 bg-slate-950/80 px-4 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-colors"
+                className="h-11 w-full rounded-xl border border-border/30 bg-slate-950/60 px-4 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-colors"
               />
             </div>
           </div>
@@ -333,16 +333,16 @@ export default function HomePage({
                           type="button"
                           variant="outline"
                           disabled={true}
-                          className="group relative h-auto w-full justify-between rounded-2xl border border-border/40 bg-slate-900/50 p-4 text-left text-slate-100 shadow-sm backdrop-blur-xl opacity-50 cursor-not-allowed"
+                          className="group relative h-auto w-full justify-between rounded-2xl border border-border/30 bg-slate-900/40 p-4 text-left text-slate-100 shadow-sm backdrop-blur-md opacity-50 cursor-not-allowed"
                         >
                           <span className="flex items-center gap-3.5">
-                            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+                            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                               <Radio className="h-5 w-5" />
                             </span>
                             <span>
                               <span className="flex items-center gap-2">
                                 <span className="text-sm font-semibold text-white">Criar sala</span>
-                                <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                                   Host
                                 </span>
                               </span>
@@ -369,16 +369,16 @@ export default function HomePage({
                 variant="outline"
                 disabled={false}
                 onClick={onCreateRoom}
-                className="group relative h-auto w-full justify-between rounded-2xl border border-border/40 bg-slate-900/50 p-4 text-left text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-150 hover:border-primary/40 hover:bg-slate-900/80 focus-visible:ring-primary"
+                className="group relative h-auto w-full justify-between rounded-2xl border border-border/30 bg-slate-900/40 p-4 text-left text-slate-100 shadow-sm backdrop-blur-md transition-all duration-150 hover:bg-slate-900/60 hover:border-border/50 focus-visible:ring-primary"
               >
                 <span className="flex items-center gap-3.5">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
                     <Radio className="h-5 w-5" />
                   </span>
                   <span>
                     <span className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-white">Criar sala</span>
-                      <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                         Host
                       </span>
                     </span>
@@ -397,16 +397,16 @@ export default function HomePage({
             variant="outline"
             disabled={displayName.trim().length === 0}
             onClick={onJoinRoom}
-            className="group relative h-auto w-full justify-between rounded-2xl border border-border/40 bg-slate-900/50 p-4 text-left text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-150 hover:border-primary/40 hover:bg-slate-900/80 focus-visible:ring-primary disabled:opacity-50"
+            className="group relative h-auto w-full justify-between rounded-2xl border border-border/30 bg-slate-900/40 p-4 text-left text-slate-100 shadow-sm backdrop-blur-md transition-all duration-150 hover:bg-slate-900/60 hover:border-border/50 focus-visible:ring-primary disabled:opacity-50"
           >
             <span className="flex items-center gap-3.5">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border/40 bg-slate-800 text-slate-200 transition-colors group-hover:bg-slate-700 group-hover:text-white">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-900/70 text-slate-200 transition-colors group-hover:bg-slate-800 group-hover:text-white">
                 <Users className="h-5 w-5" />
               </span>
               <span>
                 <span className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-white">Entrar com código</span>
-                  <span className="rounded-full border border-border/40 bg-slate-800/80 px-2 py-0.5 text-[10px] font-medium text-slate-300">
+                  <span className="rounded-full bg-slate-800/80 px-2 py-0.5 text-[10px] font-medium text-slate-300">
                     Convidado
                   </span>
                 </span>
@@ -419,175 +419,177 @@ export default function HomePage({
           </Button>
         </section>
 
-        {/* Seção Servidor de Salas com Glass Styling */}
-        <section
-          aria-labelledby="server-section-title"
-          className="mt-5 rounded-2xl border border-border/40 bg-slate-900/50 p-4 sm:p-5 shadow-md backdrop-blur-xl"
-        >
-          {/* Header com status online/conectando */}
-          <div className="flex items-center justify-between gap-3 border-b border-border/40 pb-3.5">
-            <div className="flex min-w-0 items-center gap-3">
-              <span
-                className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${
-                  isConnected
-                    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
-                    : 'border-amber-500/20 bg-amber-500/10 text-amber-300 animate-pulse'
-                }`}
-              >
-                <Server className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <h2
-                  id="server-section-title"
-                  className="text-xs font-semibold uppercase tracking-wider text-slate-300"
+        {/* Seção Servidor de Salas com Glass Styling - Oculta quando já existe uma sala ativa */}
+        {!roomIsActive && (
+          <section
+            aria-labelledby="server-section-title"
+            className="mt-5 rounded-2xl border border-border/25 bg-slate-900/30 p-4 sm:p-5 shadow-sm backdrop-blur-sm"
+          >
+            {/* Header com status online/conectando */}
+            <div className="flex items-center justify-between gap-3 border-b border-primary/15 pb-3.5">
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
+                    isConnected
+                      ? 'bg-emerald-500/10 text-emerald-400'
+                      : 'bg-amber-500/10 text-amber-300 animate-pulse'
+                  }`}
                 >
-                  Servidor de Salas
-                </h2>
-                <p className="truncate text-xs text-slate-400">
-                  {isConnected
-                    ? 'Sinalização pronta para conexões'
-                    : 'Tentando estabelecer conexão…'}
-                </p>
+                  <Server className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <h2
+                    id="server-section-title"
+                    className="text-xs font-semibold uppercase tracking-wider text-slate-300"
+                  >
+                    Servidor de Salas
+                  </h2>
+                  <p className="truncate text-xs text-slate-400">
+                    {isConnected
+                      ? 'Sinalização pronta para conexões'
+                      : 'Tentando estabelecer conexão…'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Badge de status */}
+              <div className="flex shrink-0 items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide ${
+                    isConnected
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : 'bg-amber-500/15 text-amber-300'
+                  }`}
+                >
+                  <span className="relative flex h-1.5 w-1.5">
+                    {isConnected ? (
+                      <>
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      </>
+                    ) : (
+                      <>
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      </>
+                    )}
+                  </span>
+                  {isConnected ? 'Online' : 'Conectando'}
+                </span>
               </div>
             </div>
 
-            {/* Badge de status */}
-            <div className="flex shrink-0 items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tracking-wide ${
-                  isConnected
-                    ? 'border-emerald-500/20 bg-emerald-500/15 text-emerald-300'
-                    : 'border-amber-500/20 bg-amber-500/15 text-amber-300'
-                }`}
-              >
-                <span className="relative flex h-1.5 w-1.5">
-                  {isConnected ? (
+            {/* Formulário com Input */}
+            <form onSubmit={handleServerSubmit} className="mt-3.5">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative min-w-0 flex-1">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                    <Globe className="h-4 w-4" />
+                  </div>
+                  <input
+                    id="signaling-server"
+                    type="text"
+                    required
+                    value={serverInput}
+                    onChange={(event) => {
+                      setServerInput(event.currentTarget.value);
+                      if (serverError) setServerError('');
+                    }}
+                    placeholder="http://127.0.0.1:3001 ou http://192.168.1.x:3001"
+                    autoComplete="url"
+                    className="h-10 w-full rounded-xl bg-slate-900/70 pl-9 pr-10 font-mono text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 sm:text-sm transition-colors"
+                  />
+
+                  {/* Botão de copiar endereço */}
+                  <div className="absolute inset-y-0 right-1 flex items-center">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={handleCopyServerUrl}
+                            className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
+                            aria-label="Copiar endereço do servidor"
+                          >
+                            {isCopiedServerUrl ? (
+                              <Check className="h-3.5 w-3.5 text-emerald-400" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          {isCopiedServerUrl ? 'Endereço copiado!' : 'Copiar endereço'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+
+                {/* Botão Aplicar / Conectar */}
+                <Button
+                  type="submit"
+                  disabled={isCurrentUrl && !serverError}
+                  className={`h-10 shrink-0 gap-1.5 rounded-xl px-4 font-medium transition-all ${
+                    isCurrentUrl && !serverError
+                      ? 'bg-slate-800/60 text-slate-400'
+                      : 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
+                  }`}
+                >
+                  {isCurrentUrl && !serverError ? (
                     <>
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Ativo</span>
                     </>
                   ) : (
                     <>
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      <Radio className="h-3.5 w-3.5" />
+                      <span>Conectar</span>
                     </>
                   )}
+                </Button>
+              </div>
+
+              {/* Mensagem de Erro */}
+              {serverError && (
+                <p role="alert" className="mt-2.5 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-400/10 px-3 py-2 text-xs leading-5 text-red-200 topcast-alert-animate">
+                  <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
+                  <span>{serverError}</span>
+                </p>
+              )}
+
+              {/* Rodapé com dicas */}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  Para rede local, use o IP deste computador (ex: <code className="rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-[11px] text-slate-300">192.168.1.x:3001</code>).
                 </span>
-                {isConnected ? 'Online' : 'Conectando'}
-              </span>
-            </div>
-          </div>
 
-          {/* Formulário com Input */}
-          <form onSubmit={handleServerSubmit} className="mt-3.5">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <div className="relative min-w-0 flex-1">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                  <Globe className="h-4 w-4" />
-                </div>
-                <input
-                  id="signaling-server"
-                  type="text"
-                  required
-                  value={serverInput}
-                  onChange={(event) => {
-                    setServerInput(event.currentTarget.value);
-                    if (serverError) setServerError('');
-                  }}
-                  placeholder="http://127.0.0.1:3001 ou http://192.168.1.x:3001"
-                  autoComplete="url"
-                  className="h-10 w-full rounded-xl border border-border/40 bg-slate-950/80 pl-9 pr-10 font-mono text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-primary focus:ring-2 focus:ring-primary/20 sm:text-sm transition-colors"
-                />
-
-                {/* Botão de copiar endereço */}
-                <div className="absolute inset-y-0 right-1 flex items-center">
+                {isCustomUrl && (
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          onClick={handleCopyServerUrl}
-                          className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
-                          aria-label="Copiar endereço do servidor"
+                          onClick={handleRestoreDefault}
+                          className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline text-[11px]"
                         >
-                          {isCopiedServerUrl ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-400" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
-                          )}
+                          <RotateCcw className="h-3 w-3" />
+                          Restaurar padrão
                         </button>
                       </TooltipTrigger>
                       <TooltipContent side="top">
-                        {isCopiedServerUrl ? 'Endereço copiado!' : 'Copiar endereço'}
+                        Redefinir para o servidor local padrão ({DEFAULT_SIGNALING_URL})
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                </div>
-              </div>
-
-              {/* Botão Aplicar / Conectar */}
-              <Button
-                type="submit"
-                disabled={isCurrentUrl && !serverError}
-                className={`h-10 shrink-0 gap-1.5 rounded-xl px-4 font-medium transition-all ${
-                  isCurrentUrl && !serverError
-                    ? 'bg-slate-800/60 text-slate-400'
-                    : 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
-                }`}
-              >
-                {isCurrentUrl && !serverError ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>Ativo</span>
-                  </>
-                ) : (
-                  <>
-                    <Radio className="h-3.5 w-3.5" />
-                    <span>Conectar</span>
-                  </>
                 )}
-              </Button>
-            </div>
-
-            {/* Mensagem de Erro */}
-            {serverError && (
-              <p role="alert" className="mt-2.5 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-400/10 px-3 py-2 text-xs leading-5 text-red-200">
-                <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
-                <span>{serverError}</span>
-              </p>
-            )}
-
-            {/* Rodapé com dicas */}
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-              <span className="flex items-center gap-1.5">
-                Para rede local, use o IP deste computador (ex: <code className="rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-[11px] text-slate-300">192.168.1.x:3001</code>).
-              </span>
-
-              {isCustomUrl && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={handleRestoreDefault}
-                        className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline text-[11px]"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        Restaurar padrão
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      Redefinir para o servidor local padrão ({DEFAULT_SIGNALING_URL})
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-          </form>
-        </section>
+              </div>
+            </form>
+          </section>
+        )}
 
         {notice && (
-          <p role="status" className="mt-4 rounded-xl border border-amber-400/20 bg-amber-300/[0.05] px-4 py-3 text-center text-sm text-amber-100">
+          <p role="status" className="mt-4 rounded-xl border border-amber-400/20 bg-amber-300/[0.05] px-4 py-3 text-center text-sm text-amber-100 topcast-alert-animate">
             {notice}
           </p>
         )}

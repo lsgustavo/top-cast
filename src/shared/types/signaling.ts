@@ -173,6 +173,15 @@ export interface SoundboardStopMessage {
   clipId: string;
 }
 
+export interface StreamPausedPayload {
+  paused: boolean;
+}
+
+export interface StreamPausedMessage {
+  fromParticipantId: string;
+  paused: boolean;
+}
+
 export interface ServerToClientEvents {
   'server:ready': (message: ServerReadyMessage) => void;
   'room:availability': (availability: RoomAvailability) => void;
@@ -183,6 +192,7 @@ export interface ServerToClientEvents {
   'webrtc:ice-candidate': (message: WebRtcIceCandidateMessage) => void;
   'room:soundboard-play': (message: SoundboardPlayMessage) => void;
   'room:soundboard-stop': (message: SoundboardStopMessage) => void;
+  'room:stream-paused': (message: StreamPausedMessage) => void;
 }
 
 export interface ClientToServerEvents {
@@ -227,6 +237,7 @@ export interface ClientToServerEvents {
   ) => void;
   'room:soundboard-play': (payload: SoundboardPlayPayload) => void;
   'room:soundboard-stop': (payload: SoundboardStopPayload) => void;
+  'room:stream-paused': (payload: StreamPausedPayload) => void;
 }
 
 export interface InterServerEvents {}

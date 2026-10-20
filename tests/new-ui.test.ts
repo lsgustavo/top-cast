@@ -253,4 +253,73 @@ describe('New UI Refactoring & Media Controls (NewUI.md)', () => {
     const webrtcHookContent = fs.readFileSync(webrtcHookPath, 'utf8');
     assert.ok(webrtcHookContent.includes('getRoomPresenterId'));
   });
+
+  it('implements Feature 1: Hide Local Preview (Anti-Infinite Mirror) for active presenter', () => {
+    // StreamVideo provides anti-mirror placeholder card and hidden video
+    assert.ok(roomPageContent.includes('isLocalPreviewHidden'));
+    assert.ok(roomPageContent.includes('data-local-preview-hidden-card'));
+    assert.ok(roomPageContent.includes('Prévia local oculta'));
+    assert.ok(roomPageContent.includes('Mostrar prévia'));
+    assert.ok(roomPageContent.includes('Ocultar prévia'));
+    // Button in presenter toolbar and bottom controls bar
+    assert.ok(roomPageContent.includes('<EyeOff'));
+    assert.ok(roomPageContent.includes('<Eye'));
+  });
+
+  it('implements Feature 2: Pause Stream (Quick Privacy Mode) with WebRTC track disabling and real-time signaling', () => {
+    // RoomPage has pause stream controls and overlay
+    assert.ok(roomPageContent.includes('handleToggleStreamPause'));
+    assert.ok(roomPageContent.includes('data-stream-paused-overlay'));
+    assert.ok(roomPageContent.includes('Transmissão pausada'));
+    assert.ok(roomPageContent.includes('Retomar transmissão'));
+    assert.ok(roomPageContent.includes("PAUSADO"));
+    assert.ok(roomPageContent.includes("socket.emit('room:stream-paused'"));
+    assert.ok(roomPageContent.includes("socket.on('room:stream-paused'"));
+
+    // useScreenCapture manages paused state and track toggling
+    const screenCapturePath = path.resolve('src/renderer/features/streaming/use-screen-capture.ts');
+    const screenCaptureContent = fs.readFileSync(screenCapturePath, 'utf8');
+    assert.ok(screenCaptureContent.includes('isPaused: boolean'));
+    assert.ok(screenCaptureContent.includes('setPaused'));
+    assert.ok(screenCaptureContent.includes('track.enabled = !paused'));
+
+    // Server relays room:stream-paused
+    const serverPath = path.resolve('src/server/index.ts');
+    const serverContent = fs.readFileSync(serverPath, 'utf8');
+    assert.ok(serverContent.includes("socket.on('room:stream-paused'"));
+    assert.ok(serverContent.includes("emit('room:stream-paused'"));
+  });
+
+  it('implements Feature 3: Theater Mode (Sidebar Collapse) with keyboard shortcut T', () => {
+    // RoomPage supports collapsing sidebar without entering OS fullscreen
+    assert.ok(roomPageContent.includes('isSidebarCollapsed'));
+    assert.ok(roomPageContent.includes('Modo Teatro'));
+    assert.ok(roomPageContent.includes('PanelLeftClose'));
+    assert.ok(roomPageContent.includes('PanelLeftOpen'));
+    // Keyboard shortcut T
+    assert.ok(roomPageContent.includes("e.key === 't' || e.key === 'T'"));
+    // Expands main area to max-w-none when collapsed
+    assert.ok(roomPageContent.includes("isSidebarCollapsed ? 'max-w-none' : 'max-w-[1600px]'"));
+  });
+
+  it('implements Feature 4: System Audio Switch in Source Picker Dialog and useScreenCapture propagation', () => {
+    // RoomPage renders switch in source picker footer
+    assert.ok(roomPageContent.includes('role="switch"'));
+    assert.ok(roomPageContent.includes('aria-label="Compartilhar áudio do sistema"'));
+    assert.ok(roomPageContent.includes('Áudio do sistema'));
+    assert.ok(roomPageContent.includes('onSetIncludeSystemAudio'));
+
+    // useScreenCapture respects includeSystemAudio in prepareSource and startCapture
+    const screenCapturePath = path.resolve('src/renderer/features/streaming/use-screen-capture.ts');
+    const screenCaptureContent = fs.readFileSync(screenCapturePath, 'utf8');
+    assert.ok(screenCaptureContent.includes('supportsSystemAudio && (includeSystemAudio ?? state.includeSystemAudio)'));
+    assert.ok(screenCaptureContent.includes('const shouldCaptureAudio = supportsSystemAudio && state.includeSystemAudio'));
+  });
+
+  it('hides the "Servidor de Salas" section on HomePage when a room is already active', () => {
+    const homePagePath = path.resolve('src/renderer/pages/HomePage.tsx');
+    const homePageContent = fs.readFileSync(homePagePath, 'utf8');
+    assert.ok(homePageContent.includes('{!roomIsActive && ('));
+    assert.ok(homePageContent.includes('id="server-section-title"'));
+  });
 });

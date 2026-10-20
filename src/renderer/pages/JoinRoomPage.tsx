@@ -90,15 +90,15 @@ export default function JoinRoomPage({ socket, displayName, onBack, onRoomJoined
             size="sm"
             disabled={submissionState === 'loading'}
             onClick={onBack}
-            className="h-8 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-3 text-xs font-medium text-slate-300 backdrop-blur-sm transition-all hover:bg-slate-800 hover:text-white"
+            className="h-8 gap-2 rounded-xl border border-primary/20 bg-slate-900/60 px-3 text-xs font-medium text-slate-300 backdrop-blur-md transition-all hover:border-primary/40 hover:bg-slate-800 hover:text-white"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Voltar</span>
           </Button>
         </header>
 
-        <section className="rounded-3xl border border-border/40 bg-slate-900/85 p-6 shadow-2xl backdrop-blur-2xl sm:p-8">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
+        <section className="rounded-3xl p-6 sm:p-8 glass-surface-elevated">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary shadow-sm">
             <KeyRound className="h-5 w-5" />
           </div>
 
@@ -124,7 +124,7 @@ export default function JoinRoomPage({ socket, displayName, onBack, onRoomJoined
               onChange={(event) => handleCodeChange(event.target.value)}
               aria-describedby="invite-code-hint invite-code-status"
               aria-invalid={submissionState === 'invalid'}
-              className="h-14 w-full rounded-xl border border-border/40 bg-slate-950/80 px-4 text-center font-mono text-xl tracking-[0.18em] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
+              className="h-14 w-full rounded-xl border border-border/30 bg-slate-950/60 px-4 text-center font-mono text-xl tracking-[0.18em] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
             />
             <p id="invite-code-hint" className="mt-2 text-xs text-slate-500">
               O código tem 6 letras ou números. O hífen é inserido automaticamente.

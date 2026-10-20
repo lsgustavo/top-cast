@@ -228,7 +228,7 @@ export function SettingsDialog({
                   }
                 }}
                 className={cn(
-                  'h-9 w-9 rounded-xl border border-border/40 bg-slate-900/60 text-slate-400 transition-all hover:bg-slate-800 hover:text-slate-100 focus-visible:ring-primary',
+                  'h-9 w-9 rounded-xl bg-slate-900/60 text-slate-400 backdrop-blur-md transition-all hover:bg-slate-800 hover:text-slate-100 focus-visible:ring-primary',
                   triggerClassName,
                 )}
               >
@@ -243,14 +243,14 @@ export function SettingsDialog({
       <DialogContent
         onMouseEnter={(e) => e.stopPropagation()}
         onMouseLeave={(e) => e.stopPropagation()}
-        className="max-w-2xl overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl backdrop-blur-xl"
+        className="max-w-2xl overflow-hidden rounded-2xl p-0 text-slate-100 glass-surface-elevated"
       >
         {/* Header com navegação por abas */}
-        <div className="border-b border-border/40 px-6 pt-5 pb-4">
+        <div className="border-b border-border/30 px-6 pt-5 pb-4">
           <DialogHeader className="text-left">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary shadow-sm">
                   <Settings className="h-5 w-5" />
                 </span>
                 <div>
@@ -272,7 +272,7 @@ export function SettingsDialog({
             <div
               role="tablist"
               aria-label="Abas de configurações"
-              className="mt-4 flex items-center gap-2 rounded-xl border border-border/40 bg-slate-950/60 p-1"
+              className="mt-4 flex items-center gap-2 rounded-xl border border-border/25 bg-slate-900/40 p-1"
             >
               <button
                 type="button"
@@ -342,8 +342,8 @@ export function SettingsDialog({
                         'group relative flex flex-col items-start rounded-xl p-3.5 text-left border transition-all duration-150',
                         'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                         isSelected
-                          ? 'border-primary/50 bg-primary/10 shadow-sm'
-                          : 'border-border/40 bg-slate-950/60 backdrop-blur-sm hover:border-border/80 hover:bg-slate-950/80',
+                          ? 'border-primary/50 bg-primary/10 shadow-sm ring-1 ring-primary/30'
+                          : 'border-border/25 bg-slate-900/40 hover:bg-slate-900/70 hover:border-border/40',
                       )}
                     >
                       {isSelected && (
@@ -353,18 +353,13 @@ export function SettingsDialog({
                       )}
 
                       <div
-                        className="mb-3 flex h-14 w-full items-center justify-between rounded-lg p-2 border border-border/40 shadow-inner"
+                        className="mb-3 flex h-14 w-full items-center justify-between rounded-lg p-2 shadow-inner"
                         style={{
                           backgroundColor: themeOption.bgColor,
                         }}
                       >
                         <div
-                          className={cn(
-                            'flex h-full flex-1 items-center gap-2.5 rounded-md px-3 border',
-                            themeOption.id === 'aurora-pearl'
-                              ? 'border-black/10 shadow-sm'
-                              : 'border-white/5',
-                          )}
+                          className="flex h-full flex-1 items-center gap-2.5 rounded-md px-3"
                           style={{
                             backgroundColor: themeOption.secondaryColor,
                           }}
@@ -416,10 +411,10 @@ export function SettingsDialog({
               </div>
 
               {/* 1. Foto de Perfil (Avatar Voxel Art com modal de opções) */}
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/40 bg-slate-950/60 p-4">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/25 bg-slate-900/40 p-4">
                 <div className="flex min-w-0 items-center gap-3.5">
                   <div className="relative shrink-0">
-                    <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-border/50 bg-slate-900 shadow-inner">
+                    <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-slate-950/60 ring-1 ring-border/40">
                       <VoxelAvatar displayName={localName || 'Você'} seed={localAvatarSeed} />
                     </div>
                     <span
@@ -447,7 +442,7 @@ export function SettingsDialog({
               </div>
 
               {/* 2. Nome na Sala */}
-              <div className="rounded-2xl border border-border/40 bg-slate-950/60 p-4">
+              <div className="rounded-2xl border border-border/25 bg-slate-900/40 p-4">
                 <label
                   htmlFor="user-settings-display-name"
                   className="block text-xs font-semibold uppercase tracking-wider text-slate-300"
@@ -471,7 +466,7 @@ export function SettingsDialog({
                       }
                     }}
                     placeholder="Seu nome de exibição"
-                    className="h-10 flex-1 rounded-xl border border-border/40 bg-slate-900/90 px-3.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="h-10 flex-1 rounded-xl border border-border/25 bg-slate-950/60 px-3.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
                   />
                   <Button
                     type="button"
@@ -492,7 +487,7 @@ export function SettingsDialog({
               </div>
 
               {/* 3. Status de Presença */}
-              <div className="rounded-2xl border border-border/40 bg-slate-950/60 p-4">
+              <div className="rounded-2xl border border-border/25 bg-slate-900/40 p-4">
                 <span className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
                   Seu Status
                 </span>
@@ -513,8 +508,8 @@ export function SettingsDialog({
                         className={cn(
                           'flex flex-col items-start rounded-xl border p-3 text-left transition-all',
                           isSelected
-                            ? 'border-primary/50 bg-primary/10 shadow-sm'
-                            : 'border-border/40 bg-slate-900/60 hover:border-border/80 hover:bg-slate-900',
+                            ? 'border-primary/50 bg-primary/10 shadow-sm ring-1 ring-primary/30'
+                            : 'border-border/25 bg-slate-900/30 hover:bg-slate-900/60 hover:border-border/40',
                         )}
                       >
                         <div className="flex w-full items-center justify-between gap-2">
@@ -537,13 +532,13 @@ export function SettingsDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end border-t border-border/40 px-6 py-4 bg-slate-950/40">
+        <div className="flex justify-end border-t border-border/30 px-6 py-4 bg-slate-950/40">
           <DialogFooter className="sm:justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
-              className="rounded-xl border-border/40 bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+              className="rounded-xl border border-border/40 bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-slate-100"
             >
               Fechar
             </Button>

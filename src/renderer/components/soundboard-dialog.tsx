@@ -123,10 +123,10 @@ export function SoundboardDialog({
                 size="icon"
                 aria-label="Abrir Soundboard"
                 className={cn(
-                  'relative h-8 w-8 rounded-xl border transition-all duration-150 focus-visible:ring-primary',
+                  'relative h-8 w-8 rounded-xl transition-all duration-150 focus-visible:ring-primary',
                   anyPlaying
-                    ? 'border-primary/50 bg-primary/20 text-primary shadow-sm hover:bg-primary/25 active:scale-95'
-                    : 'border-border/40 bg-slate-900/60 text-slate-400 hover:border-border/70 hover:bg-slate-800 hover:text-slate-100 active:scale-95',
+                    ? 'bg-primary/20 text-primary shadow-sm hover:bg-primary/25 active:scale-95'
+                    : 'bg-slate-900/60 text-slate-400 backdrop-blur-md hover:bg-slate-800 hover:text-slate-100 active:scale-95',
                   triggerClassName,
                 )}
               >
@@ -146,7 +146,7 @@ export function SoundboardDialog({
         </Tooltip>
       )}
 
-      <DialogContent className="max-w-md overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl backdrop-blur-xl sm:max-w-md">
+      <DialogContent className="max-w-md overflow-hidden rounded-2xl p-0 text-slate-100 glass-surface-elevated sm:max-w-md">
         {/* Luz ambiente superior suave */}
         <div
           aria-hidden="true"
@@ -154,11 +154,11 @@ export function SoundboardDialog({
         />
 
         {/* Header */}
-        <div className="relative z-10 border-b border-border/40 px-6 py-5">
+        <div className="relative z-10 border-b border-border/30 px-6 py-5">
           <DialogHeader className="text-left">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3.5">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary/10 text-primary shadow-sm">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary shadow-sm">
                   <AudioWaveform className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
@@ -183,7 +183,7 @@ export function SoundboardDialog({
                   size="sm"
                   onClick={handleStopAll}
                   aria-label="Parar todos os sons"
-                  className="h-8 gap-1 rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 text-xs font-medium text-destructive hover:bg-destructive/20 active:scale-95"
+                  className="h-8 gap-1 rounded-xl bg-destructive/15 px-2.5 text-xs font-medium text-destructive hover:bg-destructive/25 active:scale-95"
                 >
                   <Square className="h-3 w-3 fill-current" />
                   <span>Parar</span>
@@ -196,7 +196,7 @@ export function SoundboardDialog({
         {/* Conteúdo */}
         <div className="relative z-10 flex flex-col gap-4 px-6 py-5">
           {/* Controle de Volume do Soundboard */}
-          <div className="rounded-xl border border-border/40 bg-slate-950/40 p-3.5 flex flex-col gap-2.5">
+          <div className="rounded-xl border border-border/25 bg-slate-900/40 p-3.5 flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Volume2 className="h-4 w-4 text-slate-400" />
@@ -225,7 +225,7 @@ export function SoundboardDialog({
               placeholder="Buscar efeito sonoro..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-8.5 rounded-xl border border-border/40 bg-slate-950/40 pl-9 pr-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all"
+              className="w-full h-8.5 rounded-xl border border-border/30 bg-slate-950/60 pl-9 pr-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/50 transition-all"
             />
           </div>
 
@@ -246,17 +246,17 @@ export function SoundboardDialog({
                     className={cn(
                       'group relative flex cursor-pointer items-center justify-between gap-3.5 rounded-xl border p-3.5 transition-all select-none',
                       isPlaying
-                        ? 'border-primary/50 bg-primary/10 shadow-sm ring-1 ring-primary/30'
-                        : 'border-border/40 bg-slate-950/40 hover:border-border/70 hover:bg-slate-900/40',
+                        ? 'border-primary/50 bg-primary/15 shadow-sm ring-1 ring-primary/30'
+                        : 'border-border/25 bg-slate-900/40 hover:bg-slate-900/70 hover:border-border/40',
                     )}
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <span
                         className={cn(
-                          'grid h-9 w-9 shrink-0 place-items-center rounded-xl border transition-colors',
+                          'grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors',
                           isPlaying
-                            ? 'border-primary/40 bg-primary/20 text-primary shadow-sm'
-                            : 'border-border/40 bg-slate-900 text-slate-400 group-hover:text-slate-200 group-hover:border-border/60',
+                            ? 'bg-primary/25 text-primary shadow-sm'
+                            : 'bg-slate-900 text-slate-400 group-hover:text-slate-200',
                         )}
                       >
                         {isPlaying ? (
@@ -299,10 +299,10 @@ export function SoundboardDialog({
                         }}
                         aria-label={isPlaying ? `Parar som ${clip.name}` : `Tocar som ${clip.name}`}
                         className={cn(
-                          'h-8 w-8 rounded-xl border transition-all',
+                          'h-8 w-8 rounded-xl border transition-all backdrop-blur-md',
                           isPlaying
                             ? 'border-destructive/40 bg-destructive/20 text-destructive hover:bg-destructive/30'
-                            : 'border-border/40 bg-slate-900/60 text-slate-300 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
+                            : 'border-primary/20 bg-slate-900/70 text-slate-300 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
                         )}
                       >
                         {isPlaying ? (
@@ -320,7 +320,7 @@ export function SoundboardDialog({
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 flex items-center justify-between border-t border-border/40 bg-slate-950/40 px-6 py-4">
+        <div className="relative z-10 flex items-center justify-between border-t border-primary/15 bg-slate-950/70 px-6 py-4">
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
             <Sparkles className="h-3 w-3 text-primary/70 shrink-0" />
             <span>Sons executados localmente e no microfone/áudio.</span>
