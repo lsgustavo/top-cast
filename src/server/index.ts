@@ -7,6 +7,7 @@ import {
   SIGNALING_PROTOCOL_VERSION,
   type AvatarResult,
   type ClientToServerEvents,
+  type DisplayNameResult,
   type KickParticipantResult,
   type IceServersResult,
   type InterServerEvents,
@@ -76,7 +77,7 @@ io.on('connection', (socket) => {
   app.log.info({ socketId: socket.id }, 'Signaling client connected');
 
   socket.emit('server:ready', { protocolVersion: SIGNALING_PROTOCOL_VERSION });
-  socket.emit('room:availability', roomService.getAvailability());
+  socket.emit('room:availability', roomService.getAvailabilityInfo());
 
   let iceRequestWindowStartedAt = 0;
   let iceRequestsInWindow = 0;
@@ -137,7 +138,7 @@ io.on('connection', (socket) => {
       await socket.join(result.room.id);
       acknowledge(result);
       io.to(result.room.id).emit('room:updated', result.room);
-      io.emit('room:availability', roomService.getAvailability());
+      io.emit('room:availability', roomService.getAvailabilityInfo());
     } catch (error) {
       app.log.error({ error, socketId: socket.id }, 'Failed to create room');
       acknowledge({ ok: false, error: 'SERVER_ERROR' });
@@ -156,7 +157,10 @@ io.on('connection', (socket) => {
     }
 
     try {
-      const result = roomService.join(socket.id, payload?.inviteCode, payload?.displayName, payload?.avatarSeed);
+      const hasInviteCode = typeof payload?.inviteCode === 'string' && payload.inviteCode.trim().length > 0;
+      const result = hasInviteCode
+        ? roomService.join(socket.id, payload.inviteCode, payload?.displayName, payload?.avatarSeed)
+        : roomService.joinActive(socket.id, payload?.displayName, payload?.avatarSeed);
       if (!result.ok) {
         acknowledge(result);
         return;
@@ -167,6 +171,7 @@ io.on('connection', (socket) => {
       await socket.join(result.room.id);
       acknowledge(result);
       io.to(result.room.id).emit('room:updated', result.room);
+      io.emit('room:availability', roomService.getAvailabilityInfo());
     } catch (error) {
       app.log.error({ error, socketId: socket.id }, 'Failed to join room');
       acknowledge({ ok: false, error: 'SERVER_ERROR' });
@@ -194,10 +199,11 @@ io.on('connection', (socket) => {
       closeRoomSockets(result.roomId);
       io.to(result.roomId).emit('room:closed', { reason: 'host-left' });
       io.in(result.roomId).socketsLeave(result.roomId);
-      io.emit('room:availability', roomService.getAvailability());
+      io.emit('room:availability', roomService.getAvailabilityInfo());
     } else if (result.snapshot) {
       io.to(result.roomId).emit('room:updated', result.snapshot);
       void socket.leave(result.roomId);
+      io.emit('room:availability', roomService.getAvailabilityInfo());
     }
 
     acknowledge({ ok: true });
@@ -225,6 +231,7 @@ io.on('connection', (socket) => {
           void removedSocket.leave(leaveResult.roomId);
         }
         io.to(leaveResult.roomId).emit('room:updated', leaveResult.snapshot);
+        io.emit('room:availability', roomService.getAvailabilityInfo());
         result = { ok: true };
       }
     }
@@ -246,6 +253,7 @@ io.on('connection', (socket) => {
       };
     } else {
       io.to(snapshot.id).emit('room:updated', snapshot);
+      io.emit('room:availability', roomService.getAvailabilityInfo());
       result = { ok: true };
     }
     acknowledge(result);
@@ -266,6 +274,28 @@ io.on('connection', (socket) => {
       };
     } else {
       io.to(snapshot.id).emit('room:updated', snapshot);
+      io.emit('room:availability', roomService.getAvailabilityInfo());
+      result = { ok: true };
+    }
+    acknowledge(result);
+  });
+
+  socket.on('room:name', (payload, acknowledge) => {
+    if (typeof acknowledge !== 'function') {
+      app.log.warn({ socketId: socket.id }, 'Rejected room:name without acknowledgment callback');
+      return;
+    }
+
+    let result: DisplayNameResult;
+    const snapshot = roomService.setDisplayName(socket.id, payload?.displayName);
+    if (!snapshot) {
+      result = {
+        ok: false,
+        error: socket.data.roomId ? 'INVALID_NAME' : 'NOT_IN_ROOM',
+      };
+    } else {
+      io.to(snapshot.id).emit('room:updated', snapshot);
+      io.emit('room:availability', roomService.getAvailabilityInfo());
       result = { ok: true };
     }
     acknowledge(result);
@@ -371,9 +401,10 @@ io.on('connection', (socket) => {
       closeRoomSockets(result.roomId);
       io.to(result.roomId).emit('room:closed', { reason: 'host-left' });
       io.in(result.roomId).socketsLeave(result.roomId);
-      io.emit('room:availability', roomService.getAvailability());
+      io.emit('room:availability', roomService.getAvailabilityInfo());
     } else if (result?.snapshot) {
       io.to(result.roomId).emit('room:updated', result.snapshot);
+      io.emit('room:availability', roomService.getAvailabilityInfo());
     }
 
     app.log.info({ socketId: socket.id, reason }, 'Signaling client disconnected');
@@ -419,7 +450,7 @@ const roomExpiryTimer = setInterval(() => {
     io.in(roomId).socketsLeave(roomId);
   }
   if (expiredRoomIds.length > 0) {
-    io.emit('room:availability', roomService.getAvailability());
+    io.emit('room:availability', roomService.getAvailabilityInfo());
   }
 }, 60_000);
 roomExpiryTimer.unref();

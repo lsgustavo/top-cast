@@ -1,5 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import type {
+  ActiveRoomSummary,
+  RoomAvailability,
   RoomErrorCode,
   RoomOperationResult,
   RoomParticipant,
@@ -153,6 +155,57 @@ export class RoomService {
     return { ok: true, room: this.toSnapshot(room) };
   }
 
+  joinActive(
+    socketId: string,
+    rawName: unknown,
+    rawAvatarSeedOrNow?: unknown,
+    maybeNow = Date.now(),
+  ): RoomOperationResult {
+    let rawAvatarSeed: unknown = rawAvatarSeedOrNow;
+    let now = maybeNow;
+    if (typeof rawAvatarSeedOrNow === 'number') {
+      now = rawAvatarSeedOrNow;
+      rawAvatarSeed = undefined;
+    }
+
+    if (this.roomIdsBySocketId.has(socketId)) {
+      return { ok: false, error: 'ALREADY_IN_ROOM' };
+    }
+
+    const displayName = this.validateName(rawName);
+    if (!displayName) {
+      return { ok: false, error: 'INVALID_NAME' };
+    }
+
+    const room = this.roomsById.values().next().value;
+    if (!room) {
+      return { ok: false, error: 'INVALID_CODE' };
+    }
+
+    if (room.expiresAt <= now) {
+      this.expireRoom(room, now);
+      return { ok: false, error: 'ROOM_EXPIRED' };
+    }
+
+    if (room.participants.size >= MAX_PARTICIPANTS) {
+      return { ok: false, error: 'ROOM_FULL' };
+    }
+
+    const avatarSeed = this.validateAvatarSeed(rawAvatarSeed) ?? randomUUID();
+    const participant: RoomParticipant = {
+      id: socketId,
+      displayName,
+      role: 'guest',
+      joinedAt: now,
+      presence: 'available',
+      avatarSeed,
+    };
+    room.participants.set(socketId, participant);
+    this.roomIdsBySocketId.set(socketId, room.id);
+
+    return { ok: true, room: this.toSnapshot(room) };
+  }
+
   leave(socketId: string, now = Date.now(), transferHost = false): LeaveResult | undefined {
     const roomId = this.roomIdsBySocketId.get(socketId);
     if (!roomId) {
@@ -198,6 +251,25 @@ export class RoomService {
 
   getAvailability(): { active: boolean } {
     return { active: this.roomsById.size > 0 };
+  }
+
+  getAvailabilityInfo(): RoomAvailability {
+    const room = this.roomsById.values().next().value;
+    if (!room) {
+      return { active: false };
+    }
+    const host =
+      room.participants.get(room.hostSocketId) ??
+      Array.from(room.participants.values()).find((p) => p.role === 'host');
+    const summary: ActiveRoomSummary = {
+      id: room.id,
+      hostDisplayName: host?.displayName ?? 'Host',
+      hostAvatarSeed: host?.avatarSeed,
+      participantCount: room.participants.size,
+      maxParticipants: MAX_PARTICIPANTS,
+      expiresAt: room.expiresAt,
+    };
+    return { active: true, room: summary };
   }
 
   getParticipantRole(socketId: string): RoomParticipant['role'] | undefined {
@@ -253,6 +325,21 @@ export class RoomService {
       return undefined;
     }
     participant.avatarSeed = avatarSeed;
+    return this.toSnapshot(room);
+  }
+
+  setDisplayName(socketId: string, rawName: unknown): RoomSnapshot | undefined {
+    const displayName = this.validateName(rawName);
+    if (!displayName) {
+      return undefined;
+    }
+    const roomId = this.roomIdsBySocketId.get(socketId);
+    const room = roomId ? this.roomsById.get(roomId) : undefined;
+    const participant = room?.participants.get(socketId);
+    if (!room || !participant) {
+      return undefined;
+    }
+    participant.displayName = displayName;
     return this.toSnapshot(room);
   }
 

@@ -4,7 +4,6 @@ import {
   Check,
   CircleAlert,
   Copy,
-  Dice5,
   Globe,
   Radio,
   RotateCcw,
@@ -18,10 +17,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '../components/ui/tooltip';
+import { AvatarPickerDialog } from '../components/avatar-picker-dialog';
 import { SettingsDialog } from '../components/settings-dialog';
 import { VoxelAvatar } from '../components/voxel-avatar';
 import {
-  generateRandomAvatarSeed,
   getOrCreateLocalAvatarSeed,
   saveLocalAvatarSeed,
 } from '../lib/voxel-avatar';
@@ -163,8 +162,26 @@ export default function HomePage({
 
   useEffect(() => setServerInput(signalingServerUrl), [signalingServerUrl]);
 
-  function handleRandomizeAvatar() {
-    const nextSeed = generateRandomAvatarSeed();
+  useEffect(() => {
+    const handleUserSettingsUpdated = (e: Event) => {
+      const custom = e as CustomEvent<{
+        avatarSeed?: string;
+        displayName?: string;
+      }>;
+      if (custom.detail?.avatarSeed) {
+        setAvatarSeed(custom.detail.avatarSeed);
+      }
+      if (typeof custom.detail?.displayName === 'string') {
+        onDisplayNameChange(custom.detail.displayName);
+      }
+    };
+    window.addEventListener('topcast:user-settings-updated', handleUserSettingsUpdated);
+    return () => {
+      window.removeEventListener('topcast:user-settings-updated', handleUserSettingsUpdated);
+    };
+  }, [onDisplayNameChange]);
+
+  function handleSelectAvatar(nextSeed: string) {
     saveLocalAvatarSeed(nextSeed);
     setAvatarSeed(nextSeed);
   }
@@ -229,7 +246,15 @@ export default function HomePage({
 
       {/* Botão de Configurações com Glass Effect */}
       <div className="absolute right-4 top-4 z-20 [-webkit-app-region:no-drag] sm:right-6 sm:top-6">
-        <SettingsDialog />
+        <SettingsDialog
+          displayName={displayName}
+          onDisplayNameChange={onDisplayNameChange}
+          avatarSeed={avatarSeed}
+          onAvatarSeedChange={(seed) => {
+            saveLocalAvatarSeed(seed);
+            setAvatarSeed(seed);
+          }}
+        />
       </div>
 
       <div className="relative z-10 my-auto w-full max-w-[520px]">
@@ -268,22 +293,12 @@ export default function HomePage({
               <VoxelAvatar displayName={displayName || 'Você'} seed={avatarSeed} />
             </div>
 
-            {/* Botão de dado para sortear avatar */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={handleRandomizeAvatar}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/40 bg-slate-950/70 text-slate-400 shadow-sm transition-colors duration-150 hover:border-border/80 hover:bg-slate-800/70 hover:text-slate-100 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    aria-label="Sortear outro avatar"
-                  >
-                    <Dice5 className="h-5 w-5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Sortear avatar</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {/* Botão de editar para escolher ou gerar novas opções de avatar */}
+            <AvatarPickerDialog
+              displayName={displayName || 'Você'}
+              avatarSeed={avatarSeed}
+              onSelectAvatar={handleSelectAvatar}
+            />
 
             {/* Input do nome */}
             <div className="min-w-0 flex-1">

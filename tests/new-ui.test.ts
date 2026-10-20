@@ -66,11 +66,10 @@ describe('New UI Refactoring & Media Controls (NewUI.md)', () => {
     assert.ok(homePageContent.includes('animate-wave-3'));
   });
 
-  it('keeps avatar dice randomizer inside user dropdown and not in sidebar footer card', () => {
-    // Dice randomizer is inside presence dropdown
+  it('removes avatar dice randomizer from sidebar dropdown and only allows changing avatar on HomePage or Profile Settings', () => {
     assert.ok(roomPageContent.includes('role="listbox"'));
-    assert.ok(roomPageContent.includes('handleRandomizeAvatar'));
-    assert.ok(roomPageContent.includes('<Dice5'));
+    assert.ok(!roomPageContent.includes('handleRandomizeAvatar'));
+    assert.ok(!roomPageContent.includes('<Dice5'));
     // Footer profile card is a single clean button
     assert.ok(roomPageContent.includes('{/* Botão Card do Perfil */}'));
     assert.ok(!roomPageContent.includes('{/* Botão Card do Perfil com botão random direto */}'));
@@ -148,5 +147,43 @@ describe('New UI Refactoring & Media Controls (NewUI.md)', () => {
     assert.ok(webrtcHookContent.includes('scaleResolutionDownBy = 1'));
 
     assert.ok(roomPageContent.includes('max-h-full max-w-full h-auto w-auto m-auto bg-black object-contain'));
+  });
+
+  it('preserves invite code room entry ("Entrar com código") on HomePage', () => {
+    const homePagePath = path.resolve('src/renderer/pages/HomePage.tsx');
+    const homePageContent = fs.readFileSync(homePagePath, 'utf8');
+    assert.ok(homePageContent.includes('Entrar com código'));
+    assert.ok(homePageContent.includes('Conecte-se a uma sala existente com código de 6 dígitos'));
+  });
+
+  it('provides a Perfil tab in SettingsDialog and uses AvatarPickerDialog with edit icon and options modal on HomePage and Profile Settings', () => {
+    const settingsDialogPath = path.resolve('src/renderer/components/settings-dialog.tsx');
+    const settingsDialogContent = fs.readFileSync(settingsDialogPath, 'utf8');
+    assert.ok(settingsDialogContent.includes("activeTab === 'themes'"));
+    assert.ok(settingsDialogContent.includes("activeTab === 'user'"));
+    assert.ok(settingsDialogContent.includes('<span>Perfil</span>'));
+    assert.ok(settingsDialogContent.includes('Configurações de Perfil'));
+    assert.ok(settingsDialogContent.includes('<AvatarPickerDialog'));
+    assert.ok(settingsDialogContent.includes('Nome na Sala'));
+    assert.ok(settingsDialogContent.includes('Seu Status'));
+
+    const homePagePath = path.resolve('src/renderer/pages/HomePage.tsx');
+    const homePageContent = fs.readFileSync(homePagePath, 'utf8');
+    assert.ok(homePageContent.includes('<AvatarPickerDialog'));
+    assert.ok(!homePageContent.includes('<Dice5'));
+
+    const avatarPickerPath = path.resolve('src/renderer/components/avatar-picker-dialog.tsx');
+    const avatarPickerContent = fs.readFileSync(avatarPickerPath, 'utf8');
+    assert.ok(avatarPickerContent.includes('<Pencil'));
+    assert.ok(avatarPickerContent.includes('Escolher Foto de Perfil'));
+    assert.ok(avatarPickerContent.includes('Opções de foto de perfil'));
+    assert.ok(avatarPickerContent.includes('handleRandomizeOptions'));
+    assert.ok(avatarPickerContent.includes('<Dice5'));
+    assert.ok(!avatarPickerContent.includes('scale-'));
+
+    assert.ok(roomPageContent.includes('defaultTab="user"'));
+    assert.ok(roomPageContent.includes('triggerLabel="Configurações de perfil"'));
+    assert.ok(roomPageContent.includes('tooltipText="Configurações de perfil"'));
+    assert.ok(!roomPageContent.includes('{/* Botão User Settings na Sidebar */}'));
   });
 });

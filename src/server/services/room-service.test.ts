@@ -232,4 +232,29 @@ describe('RoomService', () => {
     assert.ok(updated);
     assert.equal(updated?.participants.find((p) => p.id === 'guest-socket')?.avatarSeed, 'new-random-avatar-seed');
   });
+
+  it('allows joining an active room without an invite code and updates participant display names', () => {
+    const service = new RoomService();
+    assert.deepEqual(service.getAvailabilityInfo(), { active: false });
+
+    const created = service.create('host-socket', 'Host Alice', 'host-seed', 1_000);
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+
+    const availability = service.getAvailabilityInfo();
+    assert.equal(availability.active, true);
+    assert.equal(availability.room?.hostDisplayName, 'Host Alice');
+    assert.equal(availability.room?.hostAvatarSeed, 'host-seed');
+    assert.equal(availability.room?.participantCount, 1);
+
+    const joined = service.joinActive('guest-direct', 'Guest Bob', 'guest-seed', 1_050);
+    assert.equal(joined.ok, true);
+    if (!joined.ok) return;
+    assert.equal(joined.room.participants.length, 2);
+    assert.equal(joined.room.participants[1]?.displayName, 'Guest Bob');
+
+    const renamed = service.setDisplayName('guest-direct', 'Bob Novo Nome');
+    assert.ok(renamed);
+    assert.equal(renamed?.participants.find((p) => p.id === 'guest-direct')?.displayName, 'Bob Novo Nome');
+  });
 });

@@ -61,6 +61,25 @@ export function generateRandomAvatarSeed(): string {
   return Math.random().toString(36).substring(2, 12);
 }
 
+/**
+ * Generates a list of distinct random avatar seeds for the avatar picker modal.
+ * If `currentSeed` is provided, includes it as the first option.
+ */
+export function generateRandomAvatarOptions(count = 8, currentSeed?: string): string[] {
+  const options: string[] = [];
+  const trimmedCurrent = currentSeed?.trim();
+  if (trimmedCurrent) {
+    options.push(trimmedCurrent);
+  }
+  while (options.length < count) {
+    const candidate = generateRandomAvatarSeed();
+    if (!options.includes(candidate)) {
+      options.push(candidate);
+    }
+  }
+  return options;
+}
+
 export const AVATAR_STORAGE_KEY = 'topcast:avatar_seed';
 
 /**

@@ -8,7 +8,6 @@ import {
   CircleAlert,
   Copy,
   Crown,
-  Dice5,
   HelpCircle,
   Layers,
   Loader2,
@@ -50,9 +49,9 @@ import {
   AlertDialogTrigger,
 } from '../components/ui/alert-dialog';
 import { formatRoomTimeRemaining, getParticipantAvatarHue, getParticipantInitials } from '../lib/room-ui';
-import { generateRandomAvatarSeed, saveLocalAvatarSeed } from '../lib/voxel-avatar';
+import { saveLocalAvatarSeed } from '../lib/voxel-avatar';
 import { VoxelAvatar } from '../components/voxel-avatar';
-import { updateAvatar } from '../lib/room-client';
+import { updateAvatar, updateRoomDisplayName } from '../lib/room-client';
 import { useConnectionPing } from '../lib/use-connection-ping';
 import { playMuteSound, playStreamStartSound } from '../lib/presence-sound';
 import type { RoomParticipant, RoomSnapshot } from '../../shared/types/signaling';
@@ -955,8 +954,7 @@ export default function RoomPage({
     });
   }
 
-  async function handleRandomizeAvatar() {
-    const newSeed = generateRandomAvatarSeed();
+  async function handleAvatarSeedChange(newSeed: string) {
     setLocalAvatarSeedOverride(newSeed);
     saveLocalAvatarSeed(newSeed);
 
@@ -964,6 +962,25 @@ export default function RoomPage({
       await updateAvatar(socket, newSeed);
     } catch (err) {
       console.error('Falha ao atualizar avatar:', err);
+    }
+  }
+
+  async function handleDisplayNameChange(newName: string) {
+    const trimmed = newName.trim().slice(0, 32);
+    if (!trimmed) return;
+    setParticipantActionError('');
+    try {
+      window.localStorage.setItem('topcast:display-name', trimmed);
+    } catch {
+      // ignore
+    }
+    try {
+      const result = await updateRoomDisplayName(socket, trimmed);
+      if (!result.ok) {
+        setParticipantActionError('Não foi possível atualizar seu nome na sala.');
+      }
+    } catch {
+      setParticipantActionError('Não foi possível atualizar seu nome na sala.');
     }
   }
 
@@ -1457,7 +1474,7 @@ export default function RoomPage({
                       aria-label="Opções de status de presença e avatar"
                     >
                       <div className="flex flex-col gap-1 overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-2 shadow-2xl backdrop-blur-xl">
-                        {/* Miniatura da foto de perfil e randomizador simples */}
+                        {/* Miniatura da foto de perfil e atalho para configurações de perfil */}
                         <div className="flex items-center justify-between gap-2.5 rounded-xl border border-border/40 bg-slate-950/60 p-2">
                           <div className="flex min-w-0 items-center gap-2.5">
                             <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-border/50 bg-slate-900 shadow-inner">
@@ -1476,22 +1493,23 @@ export default function RoomPage({
                             </div>
                           </div>
 
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void handleRandomizeAvatar();
-                                }}
-                                aria-label="Sortear outro avatar"
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/40 bg-slate-900 text-slate-400 shadow-sm transition-colors duration-150 hover:border-border/80 hover:bg-slate-800 hover:text-slate-100 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                              >
-                                <Dice5 className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">Sortear avatar</TooltipContent>
-                          </Tooltip>
+                          <SettingsDialog
+                            defaultTab="user"
+                            triggerLabel="Configurações de perfil"
+                            tooltipText="Configurações de perfil"
+                            triggerClassName="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/40 bg-slate-900 text-slate-400 shadow-sm transition-colors duration-150 hover:border-border/80 hover:bg-slate-800 hover:text-slate-100 active:scale-95"
+                            onOpenChange={(open) => {
+                              if (open) {
+                                setPresenceSelectOpen(false);
+                              }
+                            }}
+                            displayName={participant.displayName}
+                            onDisplayNameChange={(name) => void handleDisplayNameChange(name)}
+                            avatarSeed={localAvatarSeedOverride || participant.avatarSeed}
+                            onAvatarSeedChange={(seed) => void handleAvatarSeedChange(seed)}
+                            presence={participant.presence}
+                            onPresenceChange={(nextPresence) => handlePresenceChange(nextPresence)}
+                          />
                         </div>
 
                         {/* Divisória sutil */}
@@ -1593,7 +1611,21 @@ export default function RoomPage({
                 <TooltipContent side="bottom">Guia de Boas-Vindas</TooltipContent>
               </Tooltip>
             )}
-            <SettingsDialog />
+            <SettingsDialog
+              displayName={
+                room.participants.find((p) => p.id === selfParticipantId)?.displayName
+              }
+              onDisplayNameChange={(name) => void handleDisplayNameChange(name)}
+              avatarSeed={
+                localAvatarSeedOverride ||
+                room.participants.find((p) => p.id === selfParticipantId)?.avatarSeed
+              }
+              onAvatarSeedChange={(seed) => void handleAvatarSeedChange(seed)}
+              presence={
+                room.participants.find((p) => p.id === selfParticipantId)?.presence
+              }
+              onPresenceChange={(nextPresence) => handlePresenceChange(nextPresence)}
+            />
             {isHost ? (
               <AlertDialog>
                 <Tooltip>

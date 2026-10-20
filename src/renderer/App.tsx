@@ -71,6 +71,7 @@ export default function App() {
         : 'Nome atualizado, mas não foi possível salvá-lo.');
     }
   }
+
   const { connectionStates, remoteStreams } = useRoomWebRtc(
     socket,
     room,
@@ -113,7 +114,9 @@ export default function App() {
       }
       setRoom((currentRoom) => currentRoom?.id === updatedRoom.id ? updatedRoom : currentRoom);
     };
-    const handleRoomAvailability = ({ active }: RoomAvailability) => setRoomAvailability(active);
+    const handleRoomAvailability = ({ active }: RoomAvailability) => {
+      setRoomAvailability(active);
+    };
     const handleRoomClosed = ({ reason }: { reason: 'host-left' | 'expired' }) => {
       playPresenceSound('left');
       reconnectIdentityRef.current = null;

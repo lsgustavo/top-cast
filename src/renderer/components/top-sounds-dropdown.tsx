@@ -289,13 +289,6 @@ export function TopSoundsDropdown({
               );
             })}
           </div>
-
-          {/* Legenda sutil estilo Discord */}
-          <div className="mt-2.5 pt-2 border-t border-border/20 text-center">
-            <span className="text-[10px] text-slate-500">
-              Clique nos sons para interagir durante a transmissão
-            </span>
-          </div>
         </div>
       )}
     </div>

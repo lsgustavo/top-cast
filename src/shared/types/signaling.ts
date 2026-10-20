@@ -30,8 +30,18 @@ export interface RoomParticipant {
   avatarSeed?: string;
 }
 
+export interface ActiveRoomSummary {
+  id: string;
+  hostDisplayName: string;
+  hostAvatarSeed?: string;
+  participantCount: number;
+  maxParticipants: number;
+  expiresAt: number;
+}
+
 export interface RoomAvailability {
   active: boolean;
+  room?: ActiveRoomSummary;
 }
 
 export interface RoomSnapshot {
@@ -62,7 +72,7 @@ export interface CreateRoomPayload {
 }
 
 export interface JoinRoomPayload {
-  inviteCode: string;
+  inviteCode?: string;
   displayName: string;
   avatarSeed?: string;
 }
@@ -74,6 +84,14 @@ export interface AvatarPayload {
 export type AvatarResult =
   | { ok: true }
   | { ok: false; error: 'NOT_IN_ROOM' | 'INVALID_SEED' };
+
+export interface DisplayNamePayload {
+  displayName: string;
+}
+
+export type DisplayNameResult =
+  | { ok: true }
+  | { ok: false; error: 'NOT_IN_ROOM' | 'INVALID_NAME' };
 
 export interface LeaveRoomResponse {
   ok: true;
@@ -181,6 +199,10 @@ export interface ClientToServerEvents {
   'room:avatar': (
     payload: AvatarPayload,
     acknowledge: (result: AvatarResult) => void,
+  ) => void;
+  'room:name': (
+    payload: DisplayNamePayload,
+    acknowledge: (result: DisplayNameResult) => void,
   ) => void;
   'webrtc:description': (
     payload: WebRtcDescriptionPayload,

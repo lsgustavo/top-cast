@@ -4,6 +4,7 @@ import {
   getVoxelAvatarDataUri,
   getVoxelAvatarSvg,
   generateRandomAvatarSeed,
+  generateRandomAvatarOptions,
   getOrCreateLocalAvatarSeed,
   saveLocalAvatarSeed,
   AVATAR_STORAGE_KEY,
@@ -59,6 +60,17 @@ describe('Voxel Art DiceBear Avatars', () => {
     saveLocalAvatarSeed('custom-seed-xyz');
     assert.equal(storage.get(AVATAR_STORAGE_KEY), 'custom-seed-xyz');
     assert.equal(getOrCreateLocalAvatarSeed(), 'custom-seed-xyz');
+  });
+
+  it('generates distinct random avatar option lists for the avatar picker modal', () => {
+    const withCurrent = generateRandomAvatarOptions(8, 'my-current-seed');
+    assert.equal(withCurrent.length, 8);
+    assert.equal(withCurrent[0], 'my-current-seed');
+    assert.equal(new Set(withCurrent).size, 8);
+
+    const freshBatch = generateRandomAvatarOptions(8);
+    assert.equal(freshBatch.length, 8);
+    assert.equal(new Set(freshBatch).size, 8);
   });
 });
 
