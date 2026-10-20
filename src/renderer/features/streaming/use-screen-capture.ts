@@ -1,6 +1,115 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CaptureSource } from '../../../shared/types/desktop-api';
 import { createProcessAudioTrack, type ProcessAudioStreamController } from '../../lib/process-audio-stream';
+import { soundboardManager } from '../../lib/soundboard';
+
+interface BroadcastAudioMixController {
+  outputTrack: MediaStreamTrack;
+  setSystemAudioMuted: (muted: boolean) => void;
+  stop: () => void;
+}
+
+function createBroadcastAudioMix(
+  systemTrack: MediaStreamTrack | null,
+  soundboardTrack: MediaStreamTrack | null,
+): BroadcastAudioMixController | null {
+  if (typeof window === 'undefined') return null;
+  const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return null;
+
+  try {
+    const ctx = new AudioCtx({ sampleRate: 48000 });
+    if (ctx.state === 'suspended') {
+      void ctx.resume().catch(() => undefined);
+    }
+
+    const destination = ctx.createMediaStreamDestination();
+
+    // Compressor suave para manter os níveis de ganho equalizados entre tela e Top-Sounds
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -12;
+    compressor.knee.value = 18;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.005;
+    compressor.release.value = 0.15;
+    compressor.connect(destination);
+
+    // Oscilador silencioso mantém o clock WebRTC contínuo
+    const silentGain = ctx.createGain();
+    silentGain.gain.value = 0;
+    const osc = ctx.createOscillator();
+    osc.connect(silentGain);
+    silentGain.connect(destination);
+    osc.start();
+
+    let sysSource: MediaStreamAudioSourceNode | null = null;
+    const sysGain = ctx.createGain();
+    sysGain.gain.value = 1;
+    sysGain.connect(compressor);
+
+    if (systemTrack) {
+      try {
+        sysSource = ctx.createMediaStreamSource(new MediaStream([systemTrack]));
+        sysSource.connect(sysGain);
+      } catch {
+        // ignore
+      }
+    }
+
+    let sbSource: MediaStreamAudioSourceNode | null = null;
+    const sbGain = ctx.createGain();
+    // Ganho equalizado para efeitos do Top-Sounds na faixa de transmissão
+    sbGain.gain.value = 0.9;
+    sbGain.connect(compressor);
+
+    if (soundboardTrack) {
+      try {
+        sbSource = ctx.createMediaStreamSource(new MediaStream([soundboardTrack]));
+        sbSource.connect(sbGain);
+      } catch {
+        // ignore
+      }
+    }
+
+    const [outputTrack] = destination.stream.getAudioTracks();
+    if (!outputTrack) {
+      void ctx.close();
+      return null;
+    }
+
+    let stopped = false;
+    return {
+      outputTrack,
+      setSystemAudioMuted: (muted: boolean) => {
+        const target = muted ? 0 : 1;
+        sysGain.gain.setTargetAtTime(target, ctx.currentTime, 0.015);
+        if (systemTrack) {
+          systemTrack.enabled = !muted;
+        }
+      },
+      stop: () => {
+        if (stopped) return;
+        stopped = true;
+        try {
+          osc.stop();
+          osc.disconnect();
+          silentGain.disconnect();
+          sysSource?.disconnect();
+          sysGain.disconnect();
+          sbSource?.disconnect();
+          sbGain.disconnect();
+          compressor.disconnect();
+        } catch {
+          // ignore
+        }
+        outputTrack.stop();
+        void ctx.close();
+      },
+    };
+  } catch {
+    return null;
+  }
+}
 
 interface ScreenCaptureState {
   sources: CaptureSource[];
@@ -38,12 +147,18 @@ export function useScreenCapture() {
   });
   const streamRef = useRef<MediaStream | null>(null);
   const processAudioRef = useRef<ProcessAudioStreamController | null>(null);
+  const broadcastMixRef = useRef<BroadcastAudioMixController | null>(null);
+  const rawSystemTrackRef = useRef<MediaStreamTrack | null>(null);
   const captureApi = window.topCast?.screenCapture;
   const supportsSystemAudio = captureApi?.supportsSystemAudio ?? false;
 
   const stopCapture = useCallback(() => {
+    broadcastMixRef.current?.stop();
+    broadcastMixRef.current = null;
     processAudioRef.current?.stop();
     processAudioRef.current = null;
+    rawSystemTrackRef.current?.stop();
+    rawSystemTrackRef.current = null;
     const stream = streamRef.current;
     streamRef.current = null;
     if (stream) {
@@ -155,50 +270,93 @@ export function useScreenCapture() {
       );
 
       const isWindow = state.preparedSourceId.startsWith('window:');
+      const isScreen = state.preparedSourceId.startsWith('screen:');
 
-      // Chamada a getDisplayMedia: para tela cheia captura loopback padrão; para janela, o áudio isolado virá via WASAPI
+      // Tenta primeiro o isolamento de áudio via WASAPI tanto para janelas quanto para tela inteira ("Entire Screen"),
+      // filtrando e impedindo a captura de aplicativos de comunicação em segundo plano (Discord, VoIP, etc.).
+      let newProcessAudioController: ProcessAudioStreamController | null = null;
+      let audioWarning: string | null = null;
+
+      if (supportsSystemAudio && (isWindow || isScreen)) {
+        try {
+          newProcessAudioController = await createProcessAudioTrack(state.preparedSourceId);
+        } catch (err) {
+          console.warn('[ScreenCapture] Falha ao capturar áudio isolado via WASAPI:', err);
+          if (isWindow) {
+            const reason = err instanceof Error ? err.message : String(err);
+            audioWarning = `A janela está sendo transmitida sem áudio: ${reason}`;
+          }
+        }
+      }
+
+      // Se for tela inteira e o módulo WASAPI isolado já estiver ativo, não pede loopback bruto ao getDisplayMedia
+      // para evitar vazamento ou duplicação de chamadas VoIP/Discord.
+      const requestDisplayLoopback = !isWindow && supportsSystemAudio && !newProcessAudioController;
+
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           frameRate: { ideal: 30, max: 30 },
           width: { ideal: 1280, max: 1280 },
           height: { ideal: 720, max: 720 },
         },
-        audio: !isWindow && supportsSystemAudio,
+        audio: requestDisplayLoopback,
       });
       const [videoTrack] = stream.getVideoTracks();
       if (!videoTrack) {
+        newProcessAudioController?.stop();
         stream.getTracks().forEach((track) => track.stop());
         throw new Error('O Electron não retornou uma faixa de vídeo para a captura.');
       }
 
-      let systemAudioTrack = stream.getAudioTracks()[0] ?? null;
-      let audioWarning: string | null = null;
+      let rawSystemTrack: MediaStreamTrack | null = stream.getAudioTracks()[0] ?? null;
+      if (newProcessAudioController) {
+        // Remove eventual track nativo se veio por engano e usa o track isolado
+        for (const existingAudio of stream.getAudioTracks()) {
+          stream.removeTrack(existingAudio);
+          existingAudio.stop();
+        }
+        rawSystemTrack = newProcessAudioController.track;
+      }
 
-      // Se for janela e suportar áudio, iniciar captura de áudio isolada pelo processo.
-      // Nunca recorre ao loopback geral do sistema aqui: isso incluiria áudio de chamadas.
-      let newProcessAudioController: ProcessAudioStreamController | null = null;
-      if (isWindow && supportsSystemAudio) {
-        try {
-          newProcessAudioController = await createProcessAudioTrack(state.preparedSourceId);
-          stream.addTrack(newProcessAudioController.track);
-          systemAudioTrack = newProcessAudioController.track;
-        } catch (err) {
-          console.warn('[ScreenCapture] Falha ao capturar áudio isolado do processo:', err);
-          const reason = err instanceof Error ? err.message : String(err);
-          audioWarning = `A janela está sendo transmitida sem áudio: ${reason}`;
+      // Roteia e mixa a faixa de áudio do sistema com o bus de áudio do Top-Sounds (ganho equalizado)
+      const soundboardTrack = soundboardManager.getBroadcastAudioTrack();
+      let newBroadcastMix: BroadcastAudioMixController | null = null;
+      let finalBroadcastAudioTrack: MediaStreamTrack | null = rawSystemTrack;
+
+      if (rawSystemTrack || soundboardTrack) {
+        newBroadcastMix = createBroadcastAudioMix(rawSystemTrack, soundboardTrack);
+        if (newBroadcastMix) {
+          for (const existingAudio of stream.getAudioTracks()) {
+            stream.removeTrack(existingAudio);
+          }
+          stream.addTrack(newBroadcastMix.outputTrack);
+          finalBroadcastAudioTrack = newBroadcastMix.outputTrack;
+        } else if (rawSystemTrack && !stream.getAudioTracks().includes(rawSystemTrack)) {
+          stream.addTrack(rawSystemTrack);
+          finalBroadcastAudioTrack = rawSystemTrack;
         }
       }
 
       // Interrompe controlador de áudio e faixas anteriores após sucesso do novo stream
+      broadcastMixRef.current?.stop();
+      broadcastMixRef.current = newBroadcastMix;
       processAudioRef.current?.stop();
       processAudioRef.current = newProcessAudioController;
+      rawSystemTrackRef.current?.stop();
+      rawSystemTrackRef.current = rawSystemTrack;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = stream;
 
+      const hasAudioAvailable = Boolean(rawSystemTrack || finalBroadcastAudioTrack);
+
       videoTrack.addEventListener('ended', () => {
         if (streamRef.current === stream) {
+          broadcastMixRef.current?.stop();
+          broadcastMixRef.current = null;
           processAudioRef.current?.stop();
           processAudioRef.current = null;
+          rawSystemTrackRef.current?.stop();
+          rawSystemTrackRef.current = null;
           streamRef.current = null;
           setState((current) => ({
             ...current,
@@ -209,7 +367,7 @@ export function useScreenCapture() {
           }));
         }
       }, { once: true });
-      systemAudioTrack?.addEventListener('ended', () => {
+      rawSystemTrack?.addEventListener('ended', () => {
         setState((current) => ({
           ...current,
           hasSystemAudio: false,
@@ -220,15 +378,19 @@ export function useScreenCapture() {
         ...current,
         stream,
         isStartingCapture: false,
-        hasSystemAudio: systemAudioTrack !== null,
-        systemAudioEnabled: systemAudioTrack !== null,
+        hasSystemAudio: hasAudioAvailable,
+        systemAudioEnabled: hasAudioAvailable,
         error: audioWarning,
       }));
       return true;
     } catch (error) {
       if (!streamRef.current) {
+        broadcastMixRef.current?.stop();
+        broadcastMixRef.current = null;
         processAudioRef.current?.stop();
         processAudioRef.current = null;
+        rawSystemTrackRef.current?.stop();
+        rawSystemTrackRef.current = null;
       }
       const message = error instanceof Error ? error.message : 'Não foi possível iniciar o compartilhamento de tela.';
       setState((current) => ({
@@ -243,8 +405,24 @@ export function useScreenCapture() {
   }, [state.includeSystemAudio, state.preparedSourceId, supportsSystemAudio]);
 
   const setSystemAudioEnabled = useCallback((enabled: boolean) => {
-    const track = streamRef.current?.getAudioTracks()[0];
-    if (!track || track.readyState !== 'live') {
+    // Atualiza controlador de áudio isolado (ganho no AudioContext + track.enabled)
+    processAudioRef.current?.setEnabled(enabled);
+    // Atualiza mixador de transmissão (silencia áudio do sistema mas mantém ou silencia conforme necessário)
+    broadcastMixRef.current?.setSystemAudioMuted(!enabled);
+
+    if (rawSystemTrackRef.current) {
+      rawSystemTrackRef.current.enabled = enabled;
+    }
+
+    const activeTracks = streamRef.current?.getAudioTracks() ?? [];
+    for (const track of activeTracks) {
+      // Se não houver mixador dedicado para separar Top-Sounds, desativa diretamente a track
+      if (!broadcastMixRef.current) {
+        track.enabled = enabled;
+      }
+    }
+
+    if (activeTracks.length === 0 && !rawSystemTrackRef.current) {
       setState((current) => ({
         ...current,
         hasSystemAudio: false,
@@ -252,13 +430,17 @@ export function useScreenCapture() {
       }));
       return;
     }
-    track.enabled = enabled;
+
     setState((current) => ({ ...current, systemAudioEnabled: enabled }));
   }, []);
 
   useEffect(() => () => {
+    broadcastMixRef.current?.stop();
+    broadcastMixRef.current = null;
     processAudioRef.current?.stop();
     processAudioRef.current = null;
+    rawSystemTrackRef.current?.stop();
+    rawSystemTrackRef.current = null;
     const stream = streamRef.current;
     streamRef.current = null;
     stream?.getTracks().forEach((track) => track.stop());

@@ -108,6 +108,45 @@ describe('Soundboard & Top Sounds (Discord-style)', () => {
     assert.ok(roomPageContent.includes('<TopSoundsDropdown placement="top-right" />'));
   });
 
+  it('routes Top-Sounds audio to the broadcast stream with equalized gain and real-time room sync', () => {
+    const useScreenCapturePath = path.resolve('src/renderer/features/streaming/use-screen-capture.ts');
+    const useScreenCaptureContent = fs.readFileSync(useScreenCapturePath, 'utf8');
+    const processAudioStreamPath = path.resolve('src/renderer/lib/process-audio-stream.ts');
+    const processAudioStreamContent = fs.readFileSync(processAudioStreamPath, 'utf8');
+    const processAudioCapturePath = path.resolve('src/main/services/process-audio-capture.ts');
+    const processAudioCaptureContent = fs.readFileSync(processAudioCapturePath, 'utf8');
+    const nativeAudioCapturePath = path.resolve('src/native/audio_capture.cpp');
+    const nativeAudioCaptureContent = fs.readFileSync(nativeAudioCapturePath, 'utf8');
+
+    // 1. Broadcast de Áudio (Top-Sounds): track de transmissão com ganho equalizado + sincronização em tempo real
+    assert.ok(typeof soundboardManager.getBroadcastAudioTrack === 'function');
+    assert.ok(typeof soundboardManager.onClipPlay === 'function');
+    assert.ok(typeof soundboardManager.onClipStop === 'function');
+    assert.ok(useScreenCaptureContent.includes('createBroadcastAudioMix'));
+    assert.ok(useScreenCaptureContent.includes('createDynamicsCompressor'));
+    assert.ok(roomPageContent.includes("socket.emit('room:soundboard-play'"));
+    assert.ok(roomPageContent.includes("socket.on('room:soundboard-play'"));
+
+    // 2. Controle de Mudo (Sidebar): atualiza estado reativo da UI, track.enabled e ganho no AudioContext
+    assert.ok(useScreenCaptureContent.includes('processAudioRef.current?.setEnabled(enabled)'));
+    assert.ok(useScreenCaptureContent.includes('broadcastMixRef.current?.setSystemAudioMuted(!enabled)'));
+    assert.ok(processAudioStreamContent.includes('track.enabled = enabled'));
+    assert.ok(processAudioStreamContent.includes('masterGain.gain.setTargetAtTime'));
+    assert.ok(roomPageContent.includes('handleToggleSidebarMute'));
+
+    // 3. Isolamento de Áudio em Compartilhamento de Tela Inteira ("Entire Screen")
+    assert.ok(useScreenCaptureContent.includes("const isScreen = state.preparedSourceId.startsWith('screen:')"));
+    assert.ok(processAudioCaptureContent.includes("rawSourceId.startsWith('screen:')"));
+    assert.ok(processAudioCaptureContent.includes('startScreenIsolatedLoopback'));
+    assert.ok(nativeAudioCaptureContent.includes('PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE'));
+    assert.ok(nativeAudioCaptureContent.includes('FindFilteredCommunicationPids'));
+    assert.ok(nativeAudioCaptureContent.includes('discord.exe'));
+
+    // 4. Modo Tela Cheia & Layout Imersivo (Estilo Discord): strip lateral de participantes e overlay flutuante
+    assert.ok(roomPageContent.includes('data-immersive-participant-tile'));
+    assert.ok(roomPageContent.includes('aria-label="Participantes na transmissão"'));
+  });
+
   it('renders Discord-style Top Sounds dropdown with clean header, sound buttons grid, and pointer isolation', () => {
     assert.ok(topSoundsDropdownContent.includes('export function TopSoundsDropdown'));
     // Header "Top Sounds"

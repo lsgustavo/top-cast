@@ -335,6 +335,36 @@ io.on('connection', (socket) => {
     acknowledge({ ok: true });
   });
 
+  socket.on('room:soundboard-play', (payload) => {
+    if (!socket.data.roomId || socket.data.participantId !== socket.id) {
+      return;
+    }
+    if (!payload || typeof payload.clipId !== 'string' || payload.clipId.length === 0 || payload.clipId.length > 64) {
+      return;
+    }
+    const volume = typeof payload.volume === 'number' && !Number.isNaN(payload.volume)
+      ? Math.max(0, Math.min(1, payload.volume))
+      : 0.8;
+    socket.to(socket.data.roomId).emit('room:soundboard-play', {
+      fromParticipantId: socket.id,
+      clipId: payload.clipId,
+      volume,
+    });
+  });
+
+  socket.on('room:soundboard-stop', (payload) => {
+    if (!socket.data.roomId || socket.data.participantId !== socket.id) {
+      return;
+    }
+    if (!payload || typeof payload.clipId !== 'string' || payload.clipId.length === 0 || payload.clipId.length > 64) {
+      return;
+    }
+    socket.to(socket.data.roomId).emit('room:soundboard-stop', {
+      fromParticipantId: socket.id,
+      clipId: payload.clipId,
+    });
+  });
+
   socket.on('disconnect', (reason) => {
     const result = roomService.leave(socket.id, Date.now(), true);
     if (result?.roomClosed) {

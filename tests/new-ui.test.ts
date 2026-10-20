@@ -19,7 +19,7 @@ describe('New UI Refactoring & Media Controls (NewUI.md)', () => {
 
   it('renders volume control and slider strictly for viewers/guests, not for host', () => {
     // StreamVideo takes isHost prop
-    assert.ok(roomPageContent.includes('function StreamVideo({ stream, isHost = false }: StreamVideoProps)'));
+    assert.ok(roomPageContent.includes('function StreamVideo({ stream, isHost = false'));
     // Slider is conditionally rendered only for viewers (!isHost)
     assert.ok(roomPageContent.includes('{!isHost && ('));
     assert.ok(roomPageContent.includes('<Slider'));
@@ -108,6 +108,13 @@ describe('New UI Refactoring & Media Controls (NewUI.md)', () => {
     // StreamVideo has viewport fallback and Escape key support
     assert.ok(roomPageContent.includes("fixed inset-0 z-[100] h-screen w-screen"));
     assert.ok(roomPageContent.includes("e.key === 'Escape' && isFullscreen"));
+    assert.ok(roomPageContent.includes("topcast:request-fullscreen"));
+
+    // ScreenCapture service preserves fullscreen permissions on defaultSession
+    const screenCapturePath = path.resolve('src/main/services/screen-capture.ts');
+    const screenCaptureContent = fs.readFileSync(screenCapturePath, 'utf8');
+    assert.ok(screenCaptureContent.includes("'fullscreen'"));
+    assert.ok(screenCaptureContent.includes("'automatic-fullscreen'"));
   });
 
   it('standardizes "Encerrar esta sala?" alert dialog with dialog layout and app button design', () => {

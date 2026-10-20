@@ -29,7 +29,8 @@
               "Mmdevapi.lib",
               "Ole32.lib",
               "Avrt.lib",
-              "User32.lib"
+              "User32.lib",
+              "Kernel32.lib"
             ]
           },
           {

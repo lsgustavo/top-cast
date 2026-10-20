@@ -126,6 +126,26 @@ export interface WebRtcIceCandidateMessage {
 export type WebRtcSignalError = 'NOT_IN_ROOM' | 'PEER_NOT_IN_ROOM' | 'INVALID_SIGNAL' | 'NOT_ALLOWED';
 export type WebRtcSignalResult = { ok: true } | { ok: false; error: WebRtcSignalError };
 
+export interface SoundboardPlayPayload {
+  clipId: string;
+  volume?: number;
+}
+
+export interface SoundboardStopPayload {
+  clipId: string;
+}
+
+export interface SoundboardPlayMessage {
+  fromParticipantId: string;
+  clipId: string;
+  volume?: number;
+}
+
+export interface SoundboardStopMessage {
+  fromParticipantId: string;
+  clipId: string;
+}
+
 export interface ServerToClientEvents {
   'server:ready': (message: ServerReadyMessage) => void;
   'room:availability': (availability: RoomAvailability) => void;
@@ -134,6 +154,8 @@ export interface ServerToClientEvents {
   'room:kicked': (message: ParticipantKickedMessage) => void;
   'webrtc:description': (message: WebRtcDescriptionMessage) => void;
   'webrtc:ice-candidate': (message: WebRtcIceCandidateMessage) => void;
+  'room:soundboard-play': (message: SoundboardPlayMessage) => void;
+  'room:soundboard-stop': (message: SoundboardStopMessage) => void;
 }
 
 export interface ClientToServerEvents {
@@ -168,6 +190,8 @@ export interface ClientToServerEvents {
     payload: WebRtcIceCandidatePayload,
     acknowledge: (result: WebRtcSignalResult) => void,
   ) => void;
+  'room:soundboard-play': (payload: SoundboardPlayPayload) => void;
+  'room:soundboard-stop': (payload: SoundboardStopPayload) => void;
 }
 
 export interface InterServerEvents {}

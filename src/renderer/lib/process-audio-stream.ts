@@ -2,6 +2,7 @@ import type { ProcessAudioChunk } from '../../shared/types/desktop-api';
 
 export interface ProcessAudioStreamController {
   track: MediaStreamTrack;
+  setEnabled: (enabled: boolean) => void;
   stop: () => void;
 }
 
@@ -22,6 +23,9 @@ export function createProcessAudioTrack(sourceId: string): Promise<ProcessAudioS
       void audioCtx.resume();
     }
     const destination = audioCtx.createMediaStreamDestination();
+    const masterGain = audioCtx.createGain();
+    masterGain.gain.value = 1;
+    masterGain.connect(destination);
 
     // Mantem o stream de áudio ativo para o WebRTC transmitir imediatamente
     const silentGain = audioCtx.createGain();
@@ -59,7 +63,7 @@ export function createProcessAudioTrack(sourceId: string): Promise<ProcessAudioS
 
       const sourceNode = audioCtx.createBufferSource();
       sourceNode.buffer = audioBuffer;
-      sourceNode.connect(destination);
+      sourceNode.connect(masterGain);
 
       // Sincronizacao de buffer continuo com baixa latencia
       const currentTime = audioCtx.currentTime;
@@ -85,6 +89,11 @@ export function createProcessAudioTrack(sourceId: string): Promise<ProcessAudioS
       throw new Error('Não foi possível criar a faixa de áudio da janela.');
     }
 
+    const setEnabled = (enabled: boolean) => {
+      track.enabled = enabled;
+      masterGain.gain.setTargetAtTime(enabled ? 1 : 0, audioCtx.currentTime, 0.015);
+    };
+
     let stopped = false;
     const stop = () => {
       if (stopped) return;
@@ -95,6 +104,7 @@ export function createProcessAudioTrack(sourceId: string): Promise<ProcessAudioS
         silentOsc.stop();
         silentOsc.disconnect();
         silentGain.disconnect();
+        masterGain.disconnect();
       } catch {
         // Ignora se ja finalizado
       }
@@ -113,7 +123,7 @@ export function createProcessAudioTrack(sourceId: string): Promise<ProcessAudioS
 
     track.addEventListener('ended', stop, { once: true });
 
-    return { track, stop };
+    return { track, setEnabled, stop };
   }).catch((error: unknown) => {
     console.error('[ProcessAudio] Erro ao configurar stream de audio isolado:', error);
     throw error instanceof Error ? error : new Error(String(error));

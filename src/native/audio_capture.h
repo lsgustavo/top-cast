@@ -7,16 +7,22 @@
 #include <wrl/client.h>
 #include <wrl/implements.h>
 #include <avrt.h>
+#include <tlhelp32.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
+#include <cwctype>
 #include <functional>
 #include <future>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 using Microsoft::WRL::ComPtr;
@@ -53,14 +59,19 @@ public:
 
     static bool IsSupported();
     static DWORD GetProcessIdFromWindowHandle(HWND hwnd);
+    static std::vector<DWORD> FindFilteredCommunicationPids();
 
     bool Start(DWORD processId, AudioDataCallback callback, std::string& outError);
+    bool StartScreenIsolated(AudioDataCallback callback, std::string& outError);
     void Stop();
     bool IsRunning() const;
 
 private:
     void CaptureThreadFunc(
         DWORD processId,
+        AudioDataCallback callback,
+        std::shared_ptr<std::promise<std::string>> initPromise);
+    void ScreenIsolatedCaptureThreadFunc(
         AudioDataCallback callback,
         std::shared_ptr<std::promise<std::string>> initPromise);
     void StopLocked();

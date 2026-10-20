@@ -7,6 +7,7 @@ import {
   getSavedAudioEffects,
   saveAudioEffects,
 } from '../src/renderer/components/audio-effects-dialog.js';
+import { playMuteSound, playStreamStartSound } from '../src/renderer/lib/presence-sound.js';
 
 describe('Sidebar Connection Ping & Audio Effects (new.md)', () => {
   const roomPagePath = path.resolve('src/renderer/pages/RoomPage.tsx');
@@ -93,6 +94,21 @@ describe('Sidebar Connection Ping & Audio Effects (new.md)', () => {
   it('integrates AudioEffectsDialog trigger button in sidebar media controls row', () => {
     assert.ok(roomPageContent.includes('<AudioEffectsDialog />'));
     assert.ok(roomPageContent.includes('Áudio da tela'));
+  });
+
+  it('plays an audio cue when muting or unmuting audio', () => {
+    assert.equal(typeof playMuteSound, 'function');
+    assert.ok(roomPageContent.includes("import { playMuteSound, playStreamStartSound } from '../lib/presence-sound'"));
+    assert.ok(roomPageContent.includes('playMuteSound(true)'));
+    assert.ok(roomPageContent.includes('playMuteSound(false)'));
+    assert.ok(roomPageContent.includes('playMuteSound(!nextEnabled)'));
+    assert.ok(roomPageContent.includes('playMuteSound(nextDeafened)'));
+  });
+
+  it('plays a Discord-style Go Live audio cue when starting a transmission', () => {
+    assert.equal(typeof playStreamStartSound, 'function');
+    assert.ok(roomPageContent.includes("playStreamStartSound('start')"));
+    assert.ok(roomPageContent.includes("playStreamStartSound('stop')"));
   });
 });
 

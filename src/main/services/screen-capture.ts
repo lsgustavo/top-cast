@@ -32,24 +32,32 @@ export function configureScreenCapture(window: BrowserWindow): void {
   }
   handlersRegistered = true;
 
-  session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
-  if (permission === 'display-capture' || permission === 'media') {
-    return true;
-  }
-  return false;
-});
-session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-  if (
-    activeWindow !== null &&
-    !activeWindow.isDestroyed() &&
-    webContents.id === activeWindow.webContents.id &&
-    (permission === 'display-capture' || permission === 'media')
-  ) {
-    callback(true);
-    return;
-  }
-  callback(false);
-});
+  const allowedPermissions = new Set([
+    'display-capture',
+    'media',
+    'fullscreen',
+    'automatic-fullscreen',
+    'clipboard-read',
+    'clipboard-write',
+    'clipboard-sanitized-write',
+  ]);
+
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+    return allowedPermissions.has(permission);
+  });
+
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (
+      activeWindow !== null &&
+      !activeWindow.isDestroyed() &&
+      webContents.id === activeWindow.webContents.id &&
+      allowedPermissions.has(permission)
+    ) {
+      callback(true);
+      return;
+    }
+    callback(false);
+  });
 
   ipcMain.handle(LIST_SOURCES_CHANNEL, async (event): Promise<CaptureSource[]> => {
     if (!event.senderFrame || !isAuthorizedSender(event.sender, event.senderFrame)) {
@@ -94,35 +102,35 @@ session.defaultSession.setPermissionRequestHandler((webContents, permission, cal
     },
   );
 
- session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-  const isAuthorizedFrame =
-    request.frame !== null &&
-    activeWindow !== null &&
-    !activeWindow.isDestroyed() &&
-    request.frame.routingId === activeWindow.webContents.mainFrame.routingId;
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    const isAuthorizedFrame =
+      request.frame !== null &&
+      activeWindow !== null &&
+      !activeWindow.isDestroyed() &&
+      request.frame.routingId === activeWindow.webContents.mainFrame.routingId;
 
-  const source = selectedSourceId ? availableSources.get(selectedSourceId) : undefined;
-  const includeSystemAudio = selectedSourceIncludesAudio;
+    const source = selectedSourceId ? availableSources.get(selectedSourceId) : undefined;
+    const includeSystemAudio = selectedSourceIncludesAudio;
 
-  selectedSourceId = null;
-  selectedSourceIncludesAudio = false;
+    selectedSourceId = null;
+    selectedSourceIncludesAudio = false;
 
-  if (!source || !request.videoRequested || !isAuthorizedFrame) {
-    callback(null);
-    return;
-  }
+    if (!source || !request.videoRequested || !isAuthorizedFrame) {
+      callback(null);
+      return;
+    }
 
-  const isWholeScreen = source.id.startsWith('screen:');
+    const isWholeScreen = source.id.startsWith('screen:');
 
-  const shouldAttachAudio = request.audioRequested && includeSystemAudio && isWholeScreen;
+    const shouldAttachAudio = request.audioRequested && includeSystemAudio && isWholeScreen;
 
-  callback({
-    video: source,
-    ...(shouldAttachAudio && process.platform === 'win32'
-      ? { audio: 'loopback' as const }
-      : {}),
-  });
-}, { useSystemPicker: false });
+    callback({
+      video: source,
+      ...(shouldAttachAudio && process.platform === 'win32'
+        ? { audio: 'loopback' as const }
+        : {}),
+    });
+  }, { useSystemPicker: false });
 
   window.on('closed', () => {
     if (activeWindow === window) {

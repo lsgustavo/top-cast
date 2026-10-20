@@ -11,6 +11,12 @@ import { requestIceServers } from '../../lib/ice-configuration';
 
 export type PeerConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'failed';
 
+export interface ControlChannelSoundboardMessage {
+  type: 'soundboard:play' | 'soundboard:stop';
+  clipId: string;
+  volume?: number;
+}
+
 const PEER_CONNECTION_TIMEOUT_MS = 8_000;
 
 function relayWithAcknowledgment(

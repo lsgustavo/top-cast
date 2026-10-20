@@ -31,6 +31,7 @@ import { SettingsDialog } from '../components/settings-dialog';
 import { AudioEffectsDialog } from '../components/audio-effects-dialog';
 import { SoundboardDialog } from '../components/soundboard-dialog';
 import { TopSoundsDropdown } from '../components/top-sounds-dropdown';
+import { SOUNDBOARD_CLIPS, soundboardManager, getSoundboardVolume } from '../lib/soundboard';
 import { SourceThumbnail } from '../components/source-thumbnail';
 import {
   Dialog,
@@ -54,7 +55,8 @@ import { generateRandomAvatarSeed, saveLocalAvatarSeed } from '../lib/voxel-avat
 import { VoxelAvatar } from '../components/voxel-avatar';
 import { updateAvatar } from '../lib/room-client';
 import { useConnectionPing } from '../lib/use-connection-ping';
-import type { RoomSnapshot } from '../../shared/types/signaling';
+import { playMuteSound, playStreamStartSound } from '../lib/presence-sound';
+import type { RoomParticipant, RoomSnapshot } from '../../shared/types/signaling';
 import type { CaptureSource } from '../../shared/types/desktop-api';
 import type { SignalingStatus } from '../../shared/types/signaling';
 import type { SignalingClient } from '../lib/signaling-client';
@@ -92,15 +94,33 @@ interface RoomPageProps {
 interface StreamVideoProps {
   stream: MediaStream;
   isHost?: boolean;
+  participants?: RoomParticipant[];
+  selfParticipantId?: string | null;
+  localAvatarSeedOverride?: string | null;
+  hasSystemAudio?: boolean;
+  systemAudioEnabled?: boolean;
+  onToggleSystemAudio?: (enabled: boolean) => void;
+  isViewerDeafened?: boolean;
+  onToggleViewerDeafen?: (deafened: boolean) => void;
 }
 
-function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
+function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps) {
+  const {
+    participants = [],
+    selfParticipantId = null,
+    localAvatarSeedOverride = null,
+    hasSystemAudio = false,
+    systemAudioEnabled = true,
+    onToggleSystemAudio,
+    isViewerDeafened = false,
+    onToggleViewerDeafen,
+  } = restProps;
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(isHost);
-  const [showControls, setShowControls] = useState(false);
+  const [showControls, setShowControls] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevVolumeRef = useRef(1);
 
@@ -126,6 +146,13 @@ function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
     };
   }, [stream, isHost]);
 
+  // Sincroniza estado de mudo externo da sidebar (para convidados)
+  useEffect(() => {
+    if (!isHost) {
+      setIsMuted(isViewerDeafened);
+    }
+  }, [isViewerDeafened, isHost]);
+
   // Mantém volume e silenciamento reativamente sincronizados
   useEffect(() => {
     if (videoRef.current) {
@@ -136,7 +163,12 @@ function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
         videoRef.current.muted = isMuted;
       }
     }
-  }, [volume, isMuted, isHost]);
+    if (!isHost && stream) {
+      for (const track of stream.getAudioTracks()) {
+        track.enabled = !isMuted && volume > 0;
+      }
+    }
+  }, [volume, isMuted, isHost, stream]);
 
   // Escuta alterações de tela cheia com suporte cross-browser/Electron
   useEffect(() => {
@@ -225,20 +257,19 @@ function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
           }
         }
 
-        // Se a chamada da Fullscreen API não ocorreu ou falhou, usa fallback de viewport e sincroniza Electron
-        if (!apiSucceeded) {
-          if (window.topCast?.isFullScreen && window.topCast?.toggleFullScreen) {
-            try {
-              const isWindowFs = await window.topCast.isFullScreen();
-              if (!isWindowFs) {
-                await window.topCast.toggleFullScreen();
-              }
-            } catch {
-              // Ignora
+        // Sempre sincroniza também a janela nativa do Electron com o modo tela cheia
+        if (window.topCast?.isFullScreen && window.topCast?.toggleFullScreen) {
+          try {
+            const isWindowFs = await window.topCast.isFullScreen();
+            if (!isWindowFs) {
+              await window.topCast.toggleFullScreen();
             }
+          } catch {
+            // Ignora se fora do Electron
           }
         }
         setIsFullscreen(true);
+        resetHideTimer();
         window.dispatchEvent(new CustomEvent('topcast:fullscreen-change', { detail: { isFullscreen: true } }));
       } else {
         try {
@@ -269,6 +300,7 @@ function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
         }
 
         setIsFullscreen(false);
+        resetHideTimer();
         window.dispatchEvent(new CustomEvent('topcast:fullscreen-change', { detail: { isFullscreen: false } }));
       }
     } catch (err) {
@@ -306,9 +338,13 @@ function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
       const restore = prevVolumeRef.current > 0 ? prevVolumeRef.current : 0.8;
       setVolume(restore);
       setIsMuted(false);
+      onToggleViewerDeafen?.(false);
+      playMuteSound(false);
     } else {
       prevVolumeRef.current = volume;
       setIsMuted(true);
+      onToggleViewerDeafen?.(true);
+      playMuteSound(true);
     }
     resetHideTimer();
   };
@@ -318,8 +354,12 @@ function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
     setVolume(newVolume);
     if (newVolume > 0 && isMuted) {
       setIsMuted(false);
-    } else if (newVolume === 0) {
+      onToggleViewerDeafen?.(false);
+      playMuteSound(false);
+    } else if (newVolume === 0 && !isMuted) {
       setIsMuted(true);
+      onToggleViewerDeafen?.(true);
+      playMuteSound(true);
     }
     resetHideTimer();
   };
@@ -342,12 +382,18 @@ function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
+    const handleExternalFullscreenRequest = () => {
+      void toggleFullscreen();
+    };
+    window.addEventListener('topcast:request-fullscreen', handleExternalFullscreenRequest);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('topcast:request-fullscreen', handleExternalFullscreenRequest);
     };
   }, [isFullscreen, isMuted, volume, isHost]);
 
   useEffect(() => {
+    resetHideTimer();
     return () => {
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current);
@@ -375,6 +421,65 @@ function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
         className="h-full w-full bg-black object-contain cursor-pointer"
       />
 
+      {/* Strip/Grid de miniaturas e avatares dos participantes no Modo Imersivo (Estilo Discord) */}
+      {isFullscreen && participants.length > 0 && (
+        <aside
+          aria-label="Participantes na transmissão"
+          onClick={(e) => e.stopPropagation()}
+          onMouseEnter={() => {
+            if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+            setShowControls(true);
+          }}
+          className={`absolute right-4 top-4 bottom-20 z-30 flex flex-col items-end justify-start gap-2.5 overflow-y-auto py-1 pr-1 transition-all duration-200 ${
+            showControls ? 'opacity-100 translate-x-0 pointer-events-auto' : 'opacity-60 hover:opacity-100 pointer-events-auto'
+          }`}
+        >
+          {participants.map((participant) => {
+            const isSelf = participant.id === selfParticipantId;
+            const presenceColor =
+              participant.presence === 'available'
+                ? 'bg-emerald-400'
+                : participant.presence === 'away'
+                ? 'bg-amber-400'
+                : 'bg-red-400';
+            const isParticipantHost = participant.role === 'host';
+
+            return (
+              <div
+                key={participant.id}
+                data-immersive-participant-tile
+                className="group/tile relative flex w-36 sm:w-44 shrink-0 flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/75 p-3 shadow-xl backdrop-blur-xl transition-all duration-150 hover:border-primary/40 hover:bg-slate-900/90"
+              >
+                <div className="relative mb-2">
+                  <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-slate-900 ring-1 ring-white/15 shadow-md">
+                    <VoxelAvatar
+                      displayName={participant.displayName}
+                      seed={
+                        isSelf && localAvatarSeedOverride
+                          ? localAvatarSeedOverride
+                          : participant.avatarSeed
+                      }
+                    />
+                  </div>
+                  <span
+                    className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-950 ${presenceColor}`}
+                  />
+                </div>
+
+                <div className="flex w-full items-center justify-center gap-1 px-1">
+                  {isParticipantHost && (
+                    <Crown className="h-3 w-3 shrink-0 text-amber-400" />
+                  )}
+                  <span className="truncate text-xs font-medium text-slate-100">
+                    {participant.displayName}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </aside>
+      )}
+
       {/* Barra de controles flutuante sobre o vídeo com efeito glass */}
       <div
         className={`absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-3 py-3 sm:px-5 sm:py-4 transition-opacity duration-200 ${
@@ -386,7 +491,7 @@ function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
           setShowControls(true);
         }}
       >
-        {/* Esquerda: Badge Ao Vivo e Controle de Volume (estritamente para convidados/viewers) */}
+        {/* Esquerda: Badge Ao Vivo e Controle de Volume / Mudo */}
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/15 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-red-300 shadow-sm backdrop-blur-md select-none">
             <span className="relative flex h-2 w-2">
@@ -395,6 +500,39 @@ function StreamVideo({ stream, isHost = false }: StreamVideoProps) {
             </span>
             <span>AO VIVO</span>
           </div>
+
+          {/* Botão de Mutar transmissão para o Host no overlay flutuante */}
+          {isHost && hasSystemAudio && onToggleSystemAudio && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const nextEnabled = !systemAudioEnabled;
+                playMuteSound(!nextEnabled);
+                onToggleSystemAudio(nextEnabled);
+                resetHideTimer();
+              }}
+              className={`h-8 px-2.5 text-xs font-medium gap-1.5 rounded-xl border backdrop-blur-md transition-all ${
+                systemAudioEnabled
+                  ? 'border-border/40 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:text-white'
+                  : 'border-red-500/30 bg-red-500/15 text-red-300 hover:bg-red-500/25'
+              }`}
+              aria-label={systemAudioEnabled ? 'Mutar áudio da transmissão' : 'Ativar áudio da transmissão'}
+            >
+              {systemAudioEnabled ? (
+                <>
+                  <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Mutar</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="h-3.5 w-3.5 text-red-400" />
+                  <span>Mutado</span>
+                </>
+              )}
+            </Button>
+          )}
 
           {/* Slider de volume renderizado estritamente para o convidado */}
           {!isHost && (
@@ -527,6 +665,7 @@ export default function RoomPage({
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(getSavedSidebarWidth);
   const [isStreamFullscreen, setIsStreamFullscreen] = useState(false);
+  const [isViewerDeafened, setIsViewerDeafened] = useState(false);
   const connectionPing = useConnectionPing(socket, signalingStatus);
   const [isResizing, setIsResizing] = useState(false);
   const isResizingRef = useRef(false);
@@ -669,11 +808,85 @@ export default function RoomPage({
     };
   }, []);
 
+  const wasReceivingVideoRef = useRef(false);
+
   useEffect(() => {
     if (!presentationStream || !isReceivingVideo) {
       setIsStreamFullscreen(false);
     }
   }, [presentationStream, isReceivingVideo]);
+
+  // Reproduz efeito sonoro estilo Discord "Go Live" ao iniciar (ou encerrar) uma transmissão
+  useEffect(() => {
+    if (isReceivingVideo && !wasReceivingVideoRef.current) {
+      wasReceivingVideoRef.current = true;
+      playStreamStartSound('start');
+    } else if (!isReceivingVideo && wasReceivingVideoRef.current) {
+      wasReceivingVideoRef.current = false;
+      playStreamStartSound('stop');
+    }
+  }, [isReceivingVideo]);
+
+  // Sincronização em tempo real do Top-Sounds (Soundboard) para todos os participantes da sala
+  useEffect(() => {
+    const unsubPlay = soundboardManager.onClipPlay((clip, volume) => {
+      socket.emit('room:soundboard-play', { clipId: clip.id, volume });
+    });
+    const unsubStop = soundboardManager.onClipStop((clipId) => {
+      socket.emit('room:soundboard-stop', { clipId });
+    });
+
+    const handleRemotePlay = (payload: { fromParticipantId: string; clipId: string; volume?: number }) => {
+      if (payload.fromParticipantId === selfParticipantId) return;
+      // Se o convidado silenciou a saída de áudio na sidebar, não reproduz efeitos remotos
+      if (!isHost && isViewerDeafened) return;
+      const clip = SOUNDBOARD_CLIPS.find((c) => c.id === payload.clipId);
+      if (clip) {
+        const eqVolume = Math.max(0, Math.min(1, (payload.volume ?? 0.8) * getSoundboardVolume()));
+        soundboardManager.play(clip, eqVolume, { remote: true });
+      }
+    };
+
+    const handleRemoteStop = (payload: { fromParticipantId: string; clipId: string }) => {
+      if (payload.fromParticipantId === selfParticipantId) return;
+      soundboardManager.stop(payload.clipId, { remote: true });
+    };
+
+    socket.on('room:soundboard-play', handleRemotePlay);
+    socket.on('room:soundboard-stop', handleRemoteStop);
+
+    return () => {
+      unsubPlay();
+      unsubStop();
+      socket.off('room:soundboard-play', handleRemotePlay);
+      socket.off('room:soundboard-stop', handleRemoteStop);
+    };
+  }, [socket, selfParticipantId, isHost, isViewerDeafened]);
+
+  const handleToggleSidebarMute = () => {
+    if (isHost) {
+      const nextEnabled = !systemAudioEnabled;
+      playMuteSound(!nextEnabled);
+      onToggleSystemAudio(nextEnabled);
+      if (localStream) {
+        for (const track of localStream.getAudioTracks()) {
+          track.enabled = nextEnabled;
+        }
+      }
+    } else {
+      const nextDeafened = !isViewerDeafened;
+      playMuteSound(nextDeafened);
+      setIsViewerDeafened(nextDeafened);
+      if (remoteHostStream) {
+        for (const track of remoteHostStream.getAudioTracks()) {
+          track.enabled = !nextDeafened;
+        }
+      }
+      if (nextDeafened) {
+        soundboardManager.stopAll({ remote: true });
+      }
+    }
+  };
 
   function handlePresenceMouseEnter() {
     if (presenceCloseTimeoutRef.current !== null) {
@@ -792,11 +1005,15 @@ export default function RoomPage({
     if (!selectedSourceId || preparedSourceId !== selectedSourceId || isStartingCapture || isStartingLocally) {
       return;
     }
+    const wasAlreadyReceiving = wasReceivingVideoRef.current;
     setIsStartingLocally(true);
     try {
       const started = await onStartCapture();
       if (started) {
         setIsSourcePickerOpen(false);
+        if (wasAlreadyReceiving) {
+          playStreamStartSound('start');
+        }
       }
     } finally {
       setIsStartingLocally(false);
@@ -822,7 +1039,7 @@ export default function RoomPage({
         }}
         className={`relative z-10 flex w-full shrink-0 flex-col border-b border-border/40 bg-slate-950/70 backdrop-blur-xl p-4 sm:p-5 lg:h-screen lg:min-h-0 lg:w-[var(--sidebar-width)] lg:border-b-0 lg:border-r shadow-lg ${
           isResizing ? 'transition-none select-none' : 'transition-[width] duration-150 ease-out'
-        }`}
+        } ${isStreamFullscreen ? 'hidden' : ''}`}
       >
         <div className="flex items-center gap-3 border-b border-border/40 pb-4 [-webkit-app-region:drag]">
           <div className="grid h-10 w-10 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
@@ -1067,12 +1284,22 @@ export default function RoomPage({
               <div className="flex min-w-0 items-center gap-3">
                 <span
                   className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border transition-colors ${
-                    hasSystemAudio && systemAudioEnabled
-                      ? 'border-blue-500/20 bg-blue-500/15 text-blue-400'
-                      : 'border-border/30 bg-slate-950/70 text-slate-500'
+                    isHost
+                      ? hasSystemAudio && systemAudioEnabled
+                        ? 'border-blue-500/20 bg-blue-500/15 text-blue-400'
+                        : 'border-border/30 bg-slate-950/70 text-slate-500'
+                      : isReceivingVideo && !isViewerDeafened
+                        ? 'border-blue-500/20 bg-blue-500/15 text-blue-400'
+                        : 'border-border/30 bg-slate-950/70 text-slate-500'
                   }`}
                 >
-                  {hasSystemAudio && systemAudioEnabled ? (
+                  {isHost ? (
+                    hasSystemAudio && systemAudioEnabled ? (
+                      <Volume2 className="h-4 w-4" />
+                    ) : (
+                      <VolumeX className="h-4 w-4" />
+                    )
+                  ) : isReceivingVideo && !isViewerDeafened ? (
                     <Volume2 className="h-4 w-4" />
                   ) : (
                     <VolumeX className="h-4 w-4" />
@@ -1083,11 +1310,17 @@ export default function RoomPage({
                     Áudio da tela
                   </span>
                   <span className="block truncate text-[11px] text-slate-400">
-                    {!hasSystemAudio
-                      ? 'Nenhum som transmitido'
-                      : systemAudioEnabled
-                      ? 'Transmitindo som'
-                      : 'Áudio mutado'}
+                    {isHost
+                      ? !hasSystemAudio
+                        ? 'Nenhum som transmitido'
+                        : systemAudioEnabled
+                        ? 'Transmitindo som'
+                        : 'Áudio mutado'
+                      : !isReceivingVideo
+                        ? 'Nenhum som transmitido'
+                        : !isViewerDeafened
+                        ? 'Recebendo som'
+                        : 'Áudio mutado'}
                   </span>
                 </div>
               </div>
@@ -1099,22 +1332,30 @@ export default function RoomPage({
                 {/* Botão de Top Sounds (Soundboard) que abre para CIMA e para a DIREITA */}
                 <TopSoundsDropdown placement="top-right" />
 
-                {isHost && hasSystemAudio && (
+                {(isHost ? hasSystemAudio : isReceivingVideo) && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        aria-label={systemAudioEnabled ? 'Desativar áudio da transmissão' : 'Ativar áudio da transmissão'}
-                        onClick={() => onToggleSystemAudio(!systemAudioEnabled)}
+                        aria-label={
+                          isHost
+                            ? systemAudioEnabled
+                              ? 'Desativar áudio da transmissão'
+                              : 'Ativar áudio da transmissão'
+                            : !isViewerDeafened
+                              ? 'Desativar áudio da transmissão'
+                              : 'Ativar áudio da transmissão'
+                        }
+                        onClick={handleToggleSidebarMute}
                         className={`h-8 px-2.5 text-xs font-medium gap-1.5 rounded-xl border border-border/40 transition-all ${
-                          systemAudioEnabled
+                          (isHost ? systemAudioEnabled : !isViewerDeafened)
                             ? 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-slate-100'
                             : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
                         }`}
                       >
-                        {systemAudioEnabled ? (
+                        {(isHost ? systemAudioEnabled : !isViewerDeafened) ? (
                           <>
                             <VolumeX className="h-3.5 w-3.5 text-slate-400" />
                             <span>Mutar</span>
@@ -1128,7 +1369,9 @@ export default function RoomPage({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top">
-                      {systemAudioEnabled ? 'Mutar o som transmitido' : 'Transmitir o som da tela'}
+                      {(isHost ? systemAudioEnabled : !isViewerDeafened)
+                        ? 'Mutar o som transmitido'
+                        : 'Transmitir o som da tela'}
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -1330,8 +1573,8 @@ export default function RoomPage({
       </aside>
 
       {/* Área Principal */}
-      <div className="relative mx-auto flex min-h-full w-full max-w-[1600px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5">
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border/40 pb-4 [-webkit-app-region:drag]">
+      <div className={`relative mx-auto flex min-h-full w-full flex-1 flex-col ${isStreamFullscreen ? 'max-w-none p-0' : 'max-w-[1600px] px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5'}`}>
+        <header className={`flex shrink-0 items-center justify-between gap-4 border-b border-border/40 pb-4 [-webkit-app-region:drag] ${isStreamFullscreen ? 'hidden' : ''}`}>
           <div>
             <h2 className="text-base font-semibold tracking-tight text-slate-100">Sala de transmissão</h2>
             <p className="mt-0.5 text-xs text-slate-400">{isHost ? 'Compartilhe sua tela com a sala' : 'Acompanhe a transmissão'}</p>
@@ -1450,8 +1693,8 @@ export default function RoomPage({
         </header>
 
         {/* Player / Área Central da Stream */}
-        <div className="flex flex-1 flex-col gap-4 py-4 lg:min-h-0 lg:py-5">
-          <div className="flex min-w-0 flex-1 flex-col gap-4 lg:min-h-0">
+        <div className={`flex flex-1 flex-col ${isStreamFullscreen ? 'p-0 gap-0' : 'gap-4 py-4 lg:min-h-0 lg:py-5'}`}>
+          <div className={`flex min-w-0 flex-1 flex-col ${isStreamFullscreen ? 'gap-0' : 'gap-4 lg:min-h-0'}`}>
             <section
               className={`relative flex flex-col items-center justify-center transition-all duration-150 ${
                 isStreamFullscreen
@@ -1462,7 +1705,7 @@ export default function RoomPage({
               {presentationStream && isReceivingVideo ? (
                 <>
                   {!isStreamFullscreen && (
-                    <div className="mb-3.5 flex w-full items-center justify-between gap-3">
+                    <div className="mb-3.5 flex w-full shrink-0 items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
                         <span className="relative flex h-2 w-2">
                           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
@@ -1470,55 +1713,87 @@ export default function RoomPage({
                         </span>
                         <span>{isHost ? 'Sua tela está sendo compartilhada' : `${host?.displayName ?? 'Host'} está compartilhando`}</span>
                       </div>
-                      {isHost && (
-                        <div className="flex items-center gap-2">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={openSourcePicker}
-                                className="h-9 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-3.5 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100"
-                              >
-                                <RefreshCw className="h-3.5 w-3.5" />
-                                <span>Mudar tela</span>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              Alterar a tela ou janela transmitida sem interromper a transmissão
-                            </TooltipContent>
-                          </Tooltip>
+                      <div className="flex items-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.dispatchEvent(new CustomEvent('topcast:request-fullscreen'))}
+                              className="h-9 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-3.5 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100"
+                              aria-label="Entrar em tela cheia"
+                            >
+                              <Maximize className="h-3.5 w-3.5" />
+                              <span>Tela cheia</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Expandir transmissão em tela cheia (F)
+                          </TooltipContent>
+                        </Tooltip>
 
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={onStopCapture}
-                                className="h-9 gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 text-xs font-medium text-red-300 shadow-sm transition-all hover:border-red-500/30 hover:bg-red-500/20 hover:text-red-200"
-                              >
-                                <StopCircle className="h-3.5 w-3.5" />
-                                <span>Parar compartilhamento</span>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              Interromper transmissão da sua tela
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                      )}
+                        {isHost && (
+                          <>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={openSourcePicker}
+                                  className="h-9 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-3.5 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100"
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5" />
+                                  <span>Mudar tela</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                Alterar a tela ou janela transmitida sem interromper a transmissão
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={onStopCapture}
+                                  className="h-9 gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 text-xs font-medium text-red-300 shadow-sm transition-all hover:border-red-500/30 hover:bg-red-500/20 hover:text-red-200"
+                                >
+                                  <StopCircle className="h-3.5 w-3.5" />
+                                  <span>Parar compartilhamento</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                Interromper transmissão da sua tela
+                              </TooltipContent>
+                            </Tooltip>
+                          </>
+                        )}
+                      </div>
                     </div>
                   )}
                   <div
                     className={
                       isStreamFullscreen
                         ? 'relative h-full w-full bg-black overflow-hidden'
-                        : 'aspect-video w-full overflow-hidden rounded-xl border border-border/30 bg-black shadow-inner'
+                        : 'relative flex-1 min-h-0 aspect-video max-h-full w-full overflow-hidden rounded-xl border border-border/30 bg-black shadow-inner'
                     }
                   >
-                    <StreamVideo stream={presentationStream} isHost={isHost} />
+                    <StreamVideo
+                      stream={presentationStream}
+                      isHost={isHost}
+                      participants={room.participants}
+                      selfParticipantId={selfParticipantId}
+                      localAvatarSeedOverride={localAvatarSeedOverride}
+                      hasSystemAudio={hasSystemAudio}
+                      systemAudioEnabled={systemAudioEnabled}
+                      onToggleSystemAudio={onToggleSystemAudio}
+                      isViewerDeafened={isViewerDeafened}
+                      onToggleViewerDeafen={setIsViewerDeafened}
+                    />
                   </div>
                 </>
               ) : (

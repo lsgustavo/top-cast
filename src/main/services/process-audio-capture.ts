@@ -15,6 +15,9 @@ interface NativeAudioLoopback {
     pid: number,
     callback: (samples: Float32Array, sampleRate: number, channels: number) => void,
   ) => boolean;
+  startScreenIsolatedLoopback?: (
+    callback: (samples: Float32Array, sampleRate: number, channels: number) => void,
+  ) => boolean;
   stopProcessLoopback: () => boolean;
   isProcessLoopbackRunning: () => boolean;
 }
@@ -89,8 +92,35 @@ export function configureProcessAudioCapture(window: BrowserWindow): void {
         return { ok: false, error: 'Captura isolada por processo requer Windows 10 build 20348+ ou Windows 11' };
       }
 
-      if (typeof rawSourceId !== 'string' || !rawSourceId.startsWith('window:')) {
-        return { ok: false, error: 'Apenas origens do tipo janela suportam isolamento de processo' };
+      if (typeof rawSourceId !== 'string' || (!rawSourceId.startsWith('window:') && !rawSourceId.startsWith('screen:'))) {
+        return { ok: false, error: 'Origem de captura invalida para isolamento de audio' };
+      }
+
+      const sendChunkToRenderer = (samples: Float32Array, sampleRate: number, channels: number) => {
+        if (activeWindow && !activeWindow.isDestroyed()) {
+          activeWindow.webContents.send('app:process-audio-chunk', {
+            samples,
+            sampleRate,
+            channels,
+          });
+        }
+      };
+
+      // Tela inteira ("Entire Screen"): aplica isolamento WASAPI excluindo processos de comunicacao em segundo plano
+      if (rawSourceId.startsWith('screen:')) {
+        if (typeof nativeModule.startScreenIsolatedLoopback === 'function') {
+          try {
+            const started = nativeModule.startScreenIsolatedLoopback(sendChunkToRenderer);
+            if (!started) {
+              return { ok: false, error: 'Falha ao iniciar captura isolada WASAPI para a tela inteira' };
+            }
+            return { ok: true, pid: process.pid };
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Erro ao iniciar captura isolada de tela inteira';
+            return { ok: false, error: message };
+          }
+        }
+        return { ok: false, error: 'Isolamento de tela inteira indisponivel no modulo nativo atual' };
       }
 
       // Exemplo de sourceId: "window:131248:0" ou "window:131248"
@@ -109,18 +139,7 @@ export function configureProcessAudioCapture(window: BrowserWindow): void {
       console.log(`[ProcessAudioCapture] Iniciando captura de audio para PID ${pid} (janela: ${hwndStr})`);
 
       try {
-        const started = nativeModule.startProcessLoopback(
-          pid,
-          (samples: Float32Array, sampleRate: number, channels: number) => {
-            if (activeWindow && !activeWindow.isDestroyed()) {
-              activeWindow.webContents.send('app:process-audio-chunk', {
-                samples,
-                sampleRate,
-                channels,
-              });
-            }
-          },
-        );
+        const started = nativeModule.startProcessLoopback(pid, sendChunkToRenderer);
 
         if (!started) {
           return { ok: false, error: 'Falha ao iniciar captura WASAPI para o processo' };
