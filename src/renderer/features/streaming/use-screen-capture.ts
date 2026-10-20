@@ -293,12 +293,23 @@ export function useScreenCapture() {
       // para evitar vazamento ou duplicação de chamadas VoIP/Discord.
       const requestDisplayLoopback = !isWindow && supportsSystemAudio && !newProcessAudioController;
 
+      // Captura em Full HD (1920x1080) a 60 FPS:
+      // Para janelas (window:), utiliza max (sem forçar ideal 16:9) para preservar a proporção original da janela sem esticar;
+      // Para monitores/telas inteiras (screen:), solicita resolução Full HD 1920x1080 nativa a 60 FPS.
+      const videoConstraints: MediaTrackConstraints = isWindow
+        ? {
+            frameRate: { ideal: 60, max: 60 },
+            width: { max: 1920 },
+            height: { max: 1080 },
+          }
+        : {
+            frameRate: { ideal: 60, max: 60 },
+            width: { ideal: 1920, max: 1920 },
+            height: { ideal: 1080, max: 1080 },
+          };
+
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          frameRate: { ideal: 30, max: 30 },
-          width: { ideal: 1280, max: 1280 },
-          height: { ideal: 720, max: 720 },
-        },
+        video: videoConstraints,
         audio: requestDisplayLoopback,
       });
       const [videoTrack] = stream.getVideoTracks();
@@ -306,6 +317,10 @@ export function useScreenCapture() {
         newProcessAudioController?.stop();
         stream.getTracks().forEach((track) => track.stop());
         throw new Error('O Electron não retornou uma faixa de vídeo para a captura.');
+      }
+
+      if (typeof videoTrack.applyConstraints === 'function') {
+        void videoTrack.applyConstraints(videoConstraints).catch(() => undefined);
       }
 
       let rawSystemTrack: MediaStreamTrack | null = stream.getAudioTracks()[0] ?? null;

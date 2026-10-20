@@ -2,20 +2,13 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  DEFAULT_AUDIO_EFFECTS,
-  getSavedAudioEffects,
-  saveAudioEffects,
-} from '../src/renderer/components/audio-effects-dialog.js';
 import { playMuteSound, playStreamStartSound } from '../src/renderer/lib/presence-sound.js';
 
-describe('Sidebar Connection Ping & Audio Effects (new.md)', () => {
+describe('Sidebar Connection Ping & Audio Controls', () => {
   const roomPagePath = path.resolve('src/renderer/pages/RoomPage.tsx');
   const roomPageContent = fs.readFileSync(roomPagePath, 'utf8');
   const pingHookPath = path.resolve('src/renderer/lib/use-connection-ping.ts');
   const pingHookContent = fs.readFileSync(pingHookPath, 'utf8');
-  const audioEffectsPath = path.resolve('src/renderer/components/audio-effects-dialog.tsx');
-  const audioEffectsContent = fs.readFileSync(audioEffectsPath, 'utf8');
 
   it('provides a real-time connection ping hook with semantic color thresholds', () => {
     assert.ok(pingHookContent.includes('useConnectionPing'));
@@ -44,55 +37,9 @@ describe('Sidebar Connection Ping & Audio Effects (new.md)', () => {
     assert.ok(roomPageContent.includes('connectionPing.tooltipText'));
   });
 
-  it('provides AudioEffectsDialog component with master switch and individual audio filters', () => {
-    assert.ok(audioEffectsContent.includes('export function AudioEffectsDialog'));
-    // Audio filters: noise suppression, echo cancellation, auto gain control, high fidelity
-    assert.ok(audioEffectsContent.includes('noiseSuppression'));
-    assert.ok(audioEffectsContent.includes('echoCancellation'));
-    assert.ok(audioEffectsContent.includes('autoGainControl'));
-    assert.ok(audioEffectsContent.includes('highFidelity'));
-    // Master processing switch
-    assert.ok(audioEffectsContent.includes('Processamento de Áudio'));
-    // Sparkles icon
-    assert.ok(audioEffectsContent.includes('<Sparkles'));
-  });
-
-  it('saves and restores audio effects configuration from localStorage', () => {
-    const memoryStorage = new Map<string, string>();
-    const originalWindow = globalThis.window;
-    // Mock minimal window with localStorage
-    (globalThis as unknown as { window: unknown }).window = {
-      localStorage: {
-        getItem: (key: string) => memoryStorage.get(key) ?? null,
-        setItem: (key: string, val: string) => { memoryStorage.set(key, val); },
-      },
-      dispatchEvent: () => true,
-    };
-
-    try {
-      const initial = getSavedAudioEffects();
-      assert.deepEqual(initial, DEFAULT_AUDIO_EFFECTS);
-
-      saveAudioEffects({
-        enabled: false,
-        noiseSuppression: false,
-        echoCancellation: true,
-        autoGainControl: false,
-        highFidelity: true,
-      });
-
-      const updated = getSavedAudioEffects();
-      assert.equal(updated.enabled, false);
-      assert.equal(updated.noiseSuppression, false);
-      assert.equal(updated.echoCancellation, true);
-      assert.equal(updated.highFidelity, true);
-    } finally {
-      (globalThis as unknown as { window: unknown }).window = originalWindow;
-    }
-  });
-
-  it('integrates AudioEffectsDialog trigger button in sidebar media controls row', () => {
-    assert.ok(roomPageContent.includes('<AudioEffectsDialog />'));
+  it('does not include AudioEffectsDialog in the sidebar', () => {
+    assert.ok(!roomPageContent.includes('AudioEffectsDialog'));
+    assert.ok(!roomPageContent.includes('audio-effects-dialog'));
     assert.ok(roomPageContent.includes('Áudio da tela'));
   });
 
@@ -111,4 +58,3 @@ describe('Sidebar Connection Ping & Audio Effects (new.md)', () => {
     assert.ok(roomPageContent.includes("playStreamStartSound('stop')"));
   });
 });
-

@@ -28,7 +28,6 @@ import { Button } from '../components/ui/button';
 import { Slider } from '../components/ui/slider';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip';
 import { SettingsDialog } from '../components/settings-dialog';
-import { AudioEffectsDialog } from '../components/audio-effects-dialog';
 import { SoundboardDialog } from '../components/soundboard-dialog';
 import { TopSoundsDropdown } from '../components/top-sounds-dropdown';
 import { SOUNDBOARD_CLIPS, soundboardManager, getSoundboardVolume } from '../lib/soundboard';
@@ -418,7 +417,7 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
         playsInline
         muted={isHost ? true : isMuted}
         onDoubleClick={() => void toggleFullscreen()}
-        className="h-full w-full bg-black object-contain cursor-pointer"
+        className="max-h-full max-w-full h-auto w-auto m-auto bg-black object-contain cursor-pointer"
       />
 
       {/* Strip/Grid de miniaturas e avatares dos participantes no Modo Imersivo (Estilo Discord) */}
@@ -1326,9 +1325,6 @@ export default function RoomPage({
               </div>
 
               <div className="flex items-center gap-1.5">
-                {/* Botão de Efeitos de Áudio */}
-                <AudioEffectsDialog />
-
                 {/* Botão de Top Sounds (Soundboard) que abre para CIMA e para a DIREITA */}
                 <TopSoundsDropdown placement="top-right" />
 

@@ -18,6 +18,60 @@ export interface ControlChannelSoundboardMessage {
 }
 
 const PEER_CONNECTION_TIMEOUT_MS = 8_000;
+export const FULL_HD_VIDEO_MAX_BITRATE = 8_000_000;
+export const FULL_HD_VIDEO_MAX_FRAMERATE = 60;
+
+export async function configureFullHdVideoSender(sender: RTCRtpSender): Promise<void> {
+  if (typeof sender.getParameters !== 'function' || typeof sender.setParameters !== 'function') {
+    return;
+  }
+  try {
+    const parameters = sender.getParameters();
+    parameters.degradationPreference = 'maintain-resolution';
+    if (!parameters.encodings || parameters.encodings.length === 0) {
+      parameters.encodings = [{}];
+    }
+    for (const encoding of parameters.encodings) {
+      encoding.maxBitrate = FULL_HD_VIDEO_MAX_BITRATE;
+      encoding.maxFramerate = FULL_HD_VIDEO_MAX_FRAMERATE;
+      encoding.scaleResolutionDownBy = 1;
+    }
+    await sender.setParameters(parameters);
+  } catch {
+    // Ignora caso o ambiente não suporte ajuste de parâmetros antes da negociação
+  }
+}
+
+function preferHighQualityVideoCodecs(transceiver: RTCRtpTransceiver): void {
+  if (
+    typeof RTCRtpSender === 'undefined' ||
+    typeof RTCRtpSender.getCapabilities !== 'function' ||
+    typeof transceiver.setCodecPreferences !== 'function'
+  ) {
+    return;
+  }
+  try {
+    const capabilities = RTCRtpSender.getCapabilities('video');
+    if (!capabilities?.codecs?.length) {
+      return;
+    }
+    const preferredOrder = ['video/VP9', 'video/H264', 'video/AV1', 'video/VP8'];
+    const sortedCodecs = [...capabilities.codecs].sort((a, b) => {
+      const indexA = preferredOrder.findIndex(
+        (mime) => a.mimeType.toLowerCase() === mime.toLowerCase(),
+      );
+      const indexB = preferredOrder.findIndex(
+        (mime) => b.mimeType.toLowerCase() === mime.toLowerCase(),
+      );
+      const rankA = indexA === -1 ? preferredOrder.length : indexA;
+      const rankB = indexB === -1 ? preferredOrder.length : indexB;
+      return rankA - rankB;
+    });
+    transceiver.setCodecPreferences(sortedCodecs);
+  } catch {
+    // Ignora caso setCodecPreferences não seja suportado
+  }
+}
 
 function relayWithAcknowledgment(
   emit: (acknowledge: (result: WebRtcSignalResult) => void) => void,
@@ -246,6 +300,10 @@ export function useRoomWebRtc(
             return;
           }
           await connection.setRemoteDescription(message.description);
+          const videoSender = videoSendersRef.current.get(message.fromParticipantId);
+          if (videoSender) {
+            await configureFullHdVideoSender(videoSender);
+          }
           await addPendingCandidates(message.fromParticipantId, connection);
         }
       } catch {
@@ -387,7 +445,9 @@ export function useRoomWebRtc(
         }
         const connection = createHostConnection(iceServers);
         peerConnectionsRef.current.set(participant.id, connection);
-        const videoSender = connection.addTransceiver('video', { direction: 'sendonly' }).sender;
+        const videoTransceiver = connection.addTransceiver('video', { direction: 'sendonly' });
+        preferHighQualityVideoCodecs(videoTransceiver);
+        const videoSender = videoTransceiver.sender;
         const systemAudioSender = connection.addTransceiver('audio', { direction: 'sendonly' }).sender;
         videoSendersRef.current.set(participant.id, videoSender);
         systemAudioSendersRef.current.set(participant.id, systemAudioSender);
@@ -414,9 +474,12 @@ export function useRoomWebRtc(
   useEffect(() => {
     const videoTrack = localStream?.getVideoTracks()[0] ?? null;
     for (const [peerId, sender] of videoSendersRef.current) {
-      void sender.replaceTrack(videoTrack).catch(() => {
-        setConnectionStates((current) => ({ ...current, [peerId]: 'failed' }));
-      });
+      void sender
+        .replaceTrack(videoTrack)
+        .then(() => configureFullHdVideoSender(sender))
+        .catch(() => {
+          setConnectionStates((current) => ({ ...current, [peerId]: 'failed' }));
+        });
     }
   }, [localStream]);
 
@@ -528,6 +591,7 @@ async function negotiateHostConnection(
       videoSender.replaceTrack(videoTrack),
       systemAudioSender.replaceTrack(systemAudioTrack),
     ]);
+    await configureFullHdVideoSender(videoSender);
     await sendHostOffer(socket, peerId, connection, false);
   } catch {
     updateStatus('failed');

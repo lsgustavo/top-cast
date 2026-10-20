@@ -130,4 +130,23 @@ describe('New UI Refactoring & Media Controls (NewUI.md)', () => {
     // Action button matches destructive system action button
     assert.ok(roomPageContent.includes('h-9 gap-2 rounded-xl border border-red-500/30 bg-red-600 px-4 text-xs font-medium text-white'));
   });
+
+  it('captures and encodes transmissions in Full HD (1920x1080) at 60 FPS without stretching in fullscreen', () => {
+    const screenCaptureHookPath = path.resolve('src/renderer/features/streaming/use-screen-capture.ts');
+    const screenCaptureHookContent = fs.readFileSync(screenCaptureHookPath, 'utf8');
+    assert.ok(screenCaptureHookContent.includes('frameRate: { ideal: 60, max: 60 }'));
+    assert.ok(screenCaptureHookContent.includes('width: { ideal: 1920, max: 1920 }'));
+    assert.ok(screenCaptureHookContent.includes('height: { ideal: 1080, max: 1080 }'));
+    assert.ok(screenCaptureHookContent.includes('width: { max: 1920 }'));
+    assert.ok(screenCaptureHookContent.includes('height: { max: 1080 }'));
+
+    const webrtcHookPath = path.resolve('src/renderer/features/streaming/use-room-webrtc.ts');
+    const webrtcHookContent = fs.readFileSync(webrtcHookPath, 'utf8');
+    assert.ok(webrtcHookContent.includes("degradationPreference = 'maintain-resolution'"));
+    assert.ok(webrtcHookContent.includes('FULL_HD_VIDEO_MAX_BITRATE = 8_000_000'));
+    assert.ok(webrtcHookContent.includes('FULL_HD_VIDEO_MAX_FRAMERATE = 60'));
+    assert.ok(webrtcHookContent.includes('scaleResolutionDownBy = 1'));
+
+    assert.ok(roomPageContent.includes('max-h-full max-w-full h-auto w-auto m-auto bg-black object-contain'));
+  });
 });
