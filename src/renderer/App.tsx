@@ -72,10 +72,11 @@ export default function App() {
     }
   }
 
-  const { connectionStates, remoteStreams } = useRoomWebRtc(
+  const { connectionStates, remoteStreams, getPeerConnections } = useRoomWebRtc(
     socket,
     room,
     screenCapture.stream,
+    screenCapture.qualityPreset,
   );
 
   useEffect(() => {
@@ -307,13 +308,16 @@ export default function App() {
         supportsSystemAudio={screenCapture.supportsSystemAudio}
         hasSystemAudio={screenCapture.hasSystemAudio}
         systemAudioEnabled={screenCapture.systemAudioEnabled}
+        qualityPreset={screenCapture.qualityPreset}
         captureError={screenCapture.error}
         onLoadSources={screenCapture.loadSources}
         onPrepareSource={screenCapture.prepareSource}
         onSetIncludeSystemAudio={screenCapture.setIncludeSystemAudio}
+        onSetQualityPreset={screenCapture.setQualityPreset}
         onStartCapture={screenCapture.startCapture}
         onStopCapture={screenCapture.stopCapture}
         onToggleSystemAudio={screenCapture.setSystemAudioEnabled}
+        getPeerConnections={getPeerConnections}
         onLeaveRequested={() => {
           reconnectIdentityRef.current = null;
         }}

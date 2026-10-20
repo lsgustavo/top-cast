@@ -2,6 +2,14 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  DEFAULT_STREAM_QUALITY_PRESET,
+  getSavedStreamQualityPreset,
+  saveStreamQualityPreset,
+  STREAM_QUALITY_PRESETS,
+  STREAM_QUALITY_STORAGE_KEY,
+} from '../src/renderer/features/streaming/stream-quality.js';
+import { formatResolutionBadge } from '../src/renderer/features/streaming/use-webrtc-stats.js';
 
 describe('New UI Refactoring & Media Controls (NewUI.md)', () => {
   const roomPagePath = path.resolve('src/renderer/pages/RoomPage.tsx');
@@ -185,5 +193,47 @@ describe('New UI Refactoring & Media Controls (NewUI.md)', () => {
     assert.ok(roomPageContent.includes('triggerLabel="Configurações de perfil"'));
     assert.ok(roomPageContent.includes('tooltipText="Configurações de perfil"'));
     assert.ok(!roomPageContent.includes('{/* Botão User Settings na Sidebar */}'));
+  });
+
+  it('implements Picture-in-Picture mode, live quality preset selector, and real-time telemetry HUD', () => {
+    // Picture-in-Picture
+    assert.ok(roomPageContent.includes('togglePictureInPicture'));
+    assert.ok(roomPageContent.includes('requestPictureInPicture'));
+    assert.ok(roomPageContent.includes('exitPictureInPicture'));
+    assert.ok(roomPageContent.includes('<PictureInPicture2'));
+    assert.ok(roomPageContent.includes("e.key === 'p' || e.key === 'P'"));
+
+    // Real-time Stats HUD ("Modo Nerd")
+    assert.ok(roomPageContent.includes('Estatísticas em Tempo Real'));
+    assert.ok(roomPageContent.includes('useWebRtcStats'));
+    assert.ok(roomPageContent.includes('<Gauge'));
+
+    // Quality Preset Selector
+    assert.ok(roomPageContent.includes('Presets de qualidade da transmissão'));
+    assert.ok(roomPageContent.includes('STREAM_QUALITY_PRESET_LIST'));
+
+    // Unit checks on quality presets and resolution badges
+    assert.equal(DEFAULT_STREAM_QUALITY_PRESET, '1080p60');
+    assert.equal(STREAM_QUALITY_PRESETS['720p30'].maxBitrate, 3_500_000);
+    assert.equal(STREAM_QUALITY_PRESETS['1080p60'].maxBitrate, 8_000_000);
+    assert.equal(STREAM_QUALITY_PRESETS['1440p60'].maxBitrate, 15_000_000);
+
+    const storage = new Map<string, string>();
+    (globalThis as unknown as { window: unknown }).window = {
+      localStorage: {
+        getItem: (k: string) => storage.get(k) ?? null,
+        setItem: (k: string, v: string) => storage.set(k, v),
+      },
+    };
+    assert.equal(getSavedStreamQualityPreset(), '1080p60');
+    saveStreamQualityPreset('1440p60');
+    assert.equal(storage.get(STREAM_QUALITY_STORAGE_KEY), '1440p60');
+    assert.equal(getSavedStreamQualityPreset(), '1440p60');
+
+    assert.equal(formatResolutionBadge(2560, 1440), 'QHD');
+    assert.equal(formatResolutionBadge(1920, 1080), 'Full HD');
+    assert.equal(formatResolutionBadge(1280, 720), 'HD');
+    assert.equal(formatResolutionBadge(854, 480), 'SD');
+    assert.equal(formatResolutionBadge(null, null), '—');
   });
 });

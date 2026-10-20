@@ -2,6 +2,43 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CaptureSource } from '../../../shared/types/desktop-api';
 import { createProcessAudioTrack, type ProcessAudioStreamController } from '../../lib/process-audio-stream';
 import { soundboardManager } from '../../lib/soundboard';
+import {
+  getSavedStreamQualityPreset,
+  saveStreamQualityPreset,
+  STREAM_QUALITY_PRESETS,
+  type StreamQualityPresetId,
+} from './stream-quality';
+
+export function buildCaptureVideoConstraints(
+  presetId: StreamQualityPresetId,
+  isWindow: boolean,
+): MediaTrackConstraints {
+  if (presetId === '1080p60') {
+    return isWindow
+      ? {
+          frameRate: { ideal: 60, max: 60 },
+          width: { max: 1920 },
+          height: { max: 1080 },
+        }
+      : {
+          frameRate: { ideal: 60, max: 60 },
+          width: { ideal: 1920, max: 1920 },
+          height: { ideal: 1080, max: 1080 },
+        };
+  }
+  const preset = STREAM_QUALITY_PRESETS[presetId];
+  return isWindow
+    ? {
+        frameRate: { ideal: preset.frameRate, max: preset.frameRate },
+        width: { max: preset.width },
+        height: { max: preset.height },
+      }
+    : {
+        frameRate: { ideal: preset.frameRate, max: preset.frameRate },
+        width: { ideal: preset.width, max: preset.width },
+        height: { ideal: preset.height, max: preset.height },
+      };
+}
 
 interface BroadcastAudioMixController {
   outputTrack: MediaStreamTrack;
@@ -121,6 +158,7 @@ interface ScreenCaptureState {
   includeSystemAudio: boolean;
   hasSystemAudio: boolean;
   systemAudioEnabled: boolean;
+  qualityPreset: StreamQualityPresetId;
   error: string | null;
 }
 
@@ -133,7 +171,7 @@ function getScreenCaptureApi() {
 }
 
 export function useScreenCapture() {
-  const [state, setState] = useState<ScreenCaptureState>({
+  const [state, setState] = useState<ScreenCaptureState>(() => ({
     sources: [],
     stream: null,
     isLoadingSources: false,
@@ -143,9 +181,11 @@ export function useScreenCapture() {
     includeSystemAudio: true,
     hasSystemAudio: false,
     systemAudioEnabled: false,
+    qualityPreset: getSavedStreamQualityPreset(),
     error: null,
-  });
+  }));
   const streamRef = useRef<MediaStream | null>(null);
+  const activeSourceIdRef = useRef<string | null>(null);
   const processAudioRef = useRef<ProcessAudioStreamController | null>(null);
   const broadcastMixRef = useRef<BroadcastAudioMixController | null>(null);
   const rawSystemTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -293,20 +333,8 @@ export function useScreenCapture() {
       // para evitar vazamento ou duplicação de chamadas VoIP/Discord.
       const requestDisplayLoopback = !isWindow && supportsSystemAudio && !newProcessAudioController;
 
-      // Captura em Full HD (1920x1080) a 60 FPS:
-      // Para janelas (window:), utiliza max (sem forçar ideal 16:9) para preservar a proporção original da janela sem esticar;
-      // Para monitores/telas inteiras (screen:), solicita resolução Full HD 1920x1080 nativa a 60 FPS.
-      const videoConstraints: MediaTrackConstraints = isWindow
-        ? {
-            frameRate: { ideal: 60, max: 60 },
-            width: { max: 1920 },
-            height: { max: 1080 },
-          }
-        : {
-            frameRate: { ideal: 60, max: 60 },
-            width: { ideal: 1920, max: 1920 },
-            height: { ideal: 1080, max: 1080 },
-          };
+      // Captura conforme o preset de qualidade selecionado (1080p 60 FPS por padrão)
+      const videoConstraints = buildCaptureVideoConstraints(state.qualityPreset, isWindow);
 
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: videoConstraints,
@@ -361,6 +389,7 @@ export function useScreenCapture() {
       rawSystemTrackRef.current = rawSystemTrack;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = stream;
+      activeSourceIdRef.current = state.preparedSourceId;
 
       const hasAudioAvailable = Boolean(rawSystemTrack || finalBroadcastAudioTrack);
 
@@ -417,7 +446,23 @@ export function useScreenCapture() {
       }));
       return false;
     }
-  }, [state.includeSystemAudio, state.preparedSourceId, supportsSystemAudio]);
+  }, [state.includeSystemAudio, state.preparedSourceId, state.qualityPreset, supportsSystemAudio]);
+
+  const setQualityPreset = useCallback((presetId: StreamQualityPresetId) => {
+    saveStreamQualityPreset(presetId);
+    setState((current) => ({
+      ...current,
+      qualityPreset: presetId,
+    }));
+
+    const activeVideoTrack = streamRef.current?.getVideoTracks()[0];
+    if (activeVideoTrack && typeof activeVideoTrack.applyConstraints === 'function') {
+      const sourceId = activeSourceIdRef.current ?? state.preparedSourceId ?? '';
+      const isWindow = sourceId.startsWith('window:');
+      const nextConstraints = buildCaptureVideoConstraints(presetId, isWindow);
+      void activeVideoTrack.applyConstraints(nextConstraints).catch(() => undefined);
+    }
+  }, [state.preparedSourceId]);
 
   const setSystemAudioEnabled = useCallback((enabled: boolean) => {
     // Atualiza controlador de áudio isolado (ganho no AudioContext + track.enabled)
@@ -471,5 +516,6 @@ export function useScreenCapture() {
     stopCapture,
     setIncludeSystemAudio,
     setSystemAudioEnabled,
+    setQualityPreset,
   };
 }

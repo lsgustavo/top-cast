@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   IceServerConfiguration,
   RoomSnapshot,
@@ -8,6 +8,10 @@ import type {
 } from '../../../shared/types/signaling';
 import type { SignalingClient } from '../../lib/signaling-client';
 import { requestIceServers } from '../../lib/ice-configuration';
+import {
+  STREAM_QUALITY_PRESETS,
+  type StreamQualityPresetId,
+} from './stream-quality';
 
 export type PeerConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'failed';
 
@@ -21,10 +25,14 @@ const PEER_CONNECTION_TIMEOUT_MS = 8_000;
 export const FULL_HD_VIDEO_MAX_BITRATE = 8_000_000;
 export const FULL_HD_VIDEO_MAX_FRAMERATE = 60;
 
-export async function configureFullHdVideoSender(sender: RTCRtpSender): Promise<void> {
+export async function configureFullHdVideoSender(
+  sender: RTCRtpSender,
+  presetId: StreamQualityPresetId = '1080p60',
+): Promise<void> {
   if (typeof sender.getParameters !== 'function' || typeof sender.setParameters !== 'function') {
     return;
   }
+  const preset = STREAM_QUALITY_PRESETS[presetId];
   try {
     const parameters = sender.getParameters();
     parameters.degradationPreference = 'maintain-resolution';
@@ -32,8 +40,10 @@ export async function configureFullHdVideoSender(sender: RTCRtpSender): Promise<
       parameters.encodings = [{}];
     }
     for (const encoding of parameters.encodings) {
-      encoding.maxBitrate = FULL_HD_VIDEO_MAX_BITRATE;
-      encoding.maxFramerate = FULL_HD_VIDEO_MAX_FRAMERATE;
+      encoding.maxBitrate =
+        presetId === '1080p60' ? FULL_HD_VIDEO_MAX_BITRATE : preset.maxBitrate;
+      encoding.maxFramerate =
+        presetId === '1080p60' ? FULL_HD_VIDEO_MAX_FRAMERATE : preset.frameRate;
       encoding.scaleResolutionDownBy = 1;
     }
     await sender.setParameters(parameters);
@@ -93,6 +103,7 @@ export function useRoomWebRtc(
   socket: SignalingClient,
   room: RoomSnapshot | null,
   localStream: MediaStream | null,
+  qualityPreset: StreamQualityPresetId = '1080p60',
 ) {
   const [connectionStates, setConnectionStates] = useState<Record<string, PeerConnectionStatus>>({});
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
@@ -103,11 +114,15 @@ export function useRoomWebRtc(
   const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>());
   const selfParticipantIdRef = useRef<string | null>(null);
   const roomRef = useRef<RoomSnapshot | null>(room);
+  const qualityPresetRef = useRef<StreamQualityPresetId>(qualityPreset);
   const iceServersRequestRef = useRef<{
     socketId: string;
     promise: Promise<IceServerConfiguration[]>;
   } | null>(null);
   roomRef.current = room;
+  qualityPresetRef.current = qualityPreset;
+
+  const getPeerConnections = useCallback(() => peerConnectionsRef.current, []);
 
   const getIceServers = () => {
     const socketId = socket.id;
@@ -302,7 +317,7 @@ export function useRoomWebRtc(
           await connection.setRemoteDescription(message.description);
           const videoSender = videoSendersRef.current.get(message.fromParticipantId);
           if (videoSender) {
-            await configureFullHdVideoSender(videoSender);
+            await configureFullHdVideoSender(videoSender, qualityPresetRef.current);
           }
           await addPendingCandidates(message.fromParticipantId, connection);
         }
@@ -459,6 +474,7 @@ export function useRoomWebRtc(
           systemAudioSender,
           localStream?.getVideoTracks()[0] ?? null,
           localStream?.getAudioTracks()[0] ?? null,
+          qualityPresetRef.current,
           (status) => {
             setConnectionStates((current) => ({ ...current, [participant.id]: status }));
           },
@@ -476,12 +492,18 @@ export function useRoomWebRtc(
     for (const [peerId, sender] of videoSendersRef.current) {
       void sender
         .replaceTrack(videoTrack)
-        .then(() => configureFullHdVideoSender(sender))
+        .then(() => configureFullHdVideoSender(sender, qualityPreset))
         .catch(() => {
           setConnectionStates((current) => ({ ...current, [peerId]: 'failed' }));
         });
     }
-  }, [localStream]);
+  }, [localStream, qualityPreset]);
+
+  useEffect(() => {
+    for (const sender of videoSendersRef.current.values()) {
+      void configureFullHdVideoSender(sender, qualityPreset);
+    }
+  }, [qualityPreset]);
 
   useEffect(() => {
     const systemAudioTrack = localStream?.getAudioTracks()[0] ?? null;
@@ -492,7 +514,7 @@ export function useRoomWebRtc(
     }
   }, [localStream]);
 
-  return { connectionStates, remoteStreams };
+  return { connectionStates, remoteStreams, getPeerConnections };
 }
 
 function createHostConnection(iceServers: IceServerConfiguration[]): RTCPeerConnection {
@@ -507,6 +529,7 @@ async function negotiateHostConnection(
   systemAudioSender: RTCRtpSender,
   videoTrack: MediaStreamTrack | null,
   systemAudioTrack: MediaStreamTrack | null,
+  qualityPreset: StreamQualityPresetId,
   updateStatus: (status: PeerConnectionStatus) => void,
 ): Promise<void> {
   connection.onicecandidate = (event) => {
@@ -591,7 +614,7 @@ async function negotiateHostConnection(
       videoSender.replaceTrack(videoTrack),
       systemAudioSender.replaceTrack(systemAudioTrack),
     ]);
-    await configureFullHdVideoSender(videoSender);
+    await configureFullHdVideoSender(videoSender, qualityPreset);
     await sendHostOffer(socket, peerId, connection, false);
   } catch {
     updateStatus('failed');

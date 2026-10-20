@@ -8,6 +8,7 @@ import {
   CircleAlert,
   Copy,
   Crown,
+  Gauge,
   HelpCircle,
   Layers,
   Loader2,
@@ -15,13 +16,16 @@ import {
   Maximize,
   Minimize,
   Monitor,
+  PictureInPicture2,
   Radio,
   RefreshCw,
+  SlidersHorizontal,
   StopCircle,
   UserX,
   Volume1,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Slider } from '../components/ui/slider';
@@ -59,6 +63,15 @@ import type { CaptureSource } from '../../shared/types/desktop-api';
 import type { SignalingStatus } from '../../shared/types/signaling';
 import type { SignalingClient } from '../lib/signaling-client';
 import type { PeerConnectionStatus } from '../features/streaming/use-room-webrtc';
+import {
+  STREAM_QUALITY_PRESET_LIST,
+  STREAM_QUALITY_PRESETS,
+  type StreamQualityPresetId,
+} from '../features/streaming/stream-quality';
+import {
+  formatResolutionBadge,
+  useWebRtcStats,
+} from '../features/streaming/use-webrtc-stats';
 
 interface RoomPageProps {
   room: RoomSnapshot;
@@ -77,13 +90,16 @@ interface RoomPageProps {
   supportsSystemAudio: boolean;
   hasSystemAudio: boolean;
   systemAudioEnabled: boolean;
+  qualityPreset?: StreamQualityPresetId;
   captureError: string | null;
   onLoadSources: () => Promise<CaptureSource[]>;
   onPrepareSource: (sourceId: string | null, includeSystemAudio?: boolean) => Promise<boolean>;
   onSetIncludeSystemAudio?: (include: boolean) => void;
+  onSetQualityPreset?: (presetId: StreamQualityPresetId) => void;
   onStartCapture: () => Promise<boolean>;
   onStopCapture: () => void;
   onToggleSystemAudio: (enabled: boolean) => void;
+  getPeerConnections?: () => Map<string, RTCPeerConnection>;
   onLeaveRequested: () => void;
   onLeave: () => void;
   onOpenWelcome?: () => void;
@@ -100,6 +116,9 @@ interface StreamVideoProps {
   onToggleSystemAudio?: (enabled: boolean) => void;
   isViewerDeafened?: boolean;
   onToggleViewerDeafen?: (deafened: boolean) => void;
+  qualityPreset?: StreamQualityPresetId;
+  onSetQualityPreset?: (presetId: StreamQualityPresetId) => void;
+  getPeerConnections?: () => Map<string, RTCPeerConnection>;
 }
 
 function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps) {
@@ -112,15 +131,29 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
     onToggleSystemAudio,
     isViewerDeafened = false,
     onToggleViewerDeafen,
+    qualityPreset = '1080p60',
+    onSetQualityPreset,
+    getPeerConnections,
   } = restProps;
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPip, setIsPip] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(isHost);
   const [showControls, setShowControls] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevVolumeRef = useRef(1);
+
+  const liveStats = useWebRtcStats({
+    enabled: showStats,
+    isHost,
+    stream,
+    videoElement: videoRef.current,
+    getPeerConnections,
+  });
 
   // Sincroniza stream no elemento de vídeo
   useEffect(() => {
@@ -167,6 +200,49 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
       }
     }
   }, [volume, isMuted, isHost, stream]);
+
+  // Escuta alterações de Picture-in-Picture no elemento de vídeo
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    const handleEnterPip = () => setIsPip(true);
+    const handleLeavePip = () => setIsPip(false);
+
+    videoEl.addEventListener('enterpictureinpicture', handleEnterPip);
+    videoEl.addEventListener('leavepictureinpicture', handleLeavePip);
+
+    return () => {
+      videoEl.removeEventListener('enterpictureinpicture', handleEnterPip);
+      videoEl.removeEventListener('leavepictureinpicture', handleLeavePip);
+    };
+  }, []);
+
+  const togglePictureInPicture = async () => {
+    const videoEl = videoRef.current as (HTMLVideoElement & {
+      requestPictureInPicture?: () => Promise<PictureInPictureWindow>;
+    }) | null;
+    const doc = document as Document & {
+      pictureInPictureElement?: Element | null;
+      exitPictureInPicture?: () => Promise<void>;
+    };
+    if (!videoEl) return;
+
+    try {
+      if (doc.pictureInPictureElement) {
+        if (doc.exitPictureInPicture) {
+          await doc.exitPictureInPicture();
+        }
+        setIsPip(false);
+      } else if (typeof videoEl.requestPictureInPicture === 'function') {
+        await videoEl.requestPictureInPicture();
+        setIsPip(true);
+      }
+    } catch (err) {
+      console.warn('[StreamVideo] Falha ao alternar Picture-in-Picture:', err);
+    }
+    resetHideTimer();
+  };
 
   // Escuta alterações de tela cheia com suporte cross-browser/Electron
   useEffect(() => {
@@ -362,7 +438,7 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
     resetHideTimer();
   };
 
-  // Atalhos de teclado: F para tela cheia (todos os usuários), Esc para sair, M para mutar (estritamente para quem assiste)
+  // Atalhos de teclado: F para tela cheia, P para Picture-in-Picture, Esc para sair, M para mutar (estritamente para quem assiste)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeTag = document.activeElement?.tagName.toLowerCase();
@@ -371,6 +447,9 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         void toggleFullscreen();
+      } else if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        void togglePictureInPicture();
       } else if (e.key === 'Escape' && isFullscreen) {
         e.preventDefault();
         void toggleFullscreen();
@@ -388,7 +467,7 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('topcast:request-fullscreen', handleExternalFullscreenRequest);
     };
-  }, [isFullscreen, isMuted, volume, isHost]);
+  }, [isFullscreen, isPip, isMuted, volume, isHost]);
 
   useEffect(() => {
     resetHideTimer();
@@ -418,6 +497,107 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
         onDoubleClick={() => void toggleFullscreen()}
         className="max-h-full max-w-full h-auto w-auto m-auto bg-black object-contain cursor-pointer"
       />
+
+      {/* HUD de Estatísticas em Tempo Real ("Modo Nerd") */}
+      {showStats && (
+        <section
+          role="region"
+          aria-label="Estatísticas da transmissão em tempo real"
+          onClick={(e) => e.stopPropagation()}
+          onMouseEnter={() => {
+            if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+            setShowControls(true);
+          }}
+          className="absolute left-3.5 top-3.5 z-30 w-64 sm:w-72 rounded-2xl border border-white/10 bg-slate-950/85 p-3.5 text-xs text-slate-200 shadow-2xl backdrop-blur-xl"
+        >
+          <div className="flex items-center justify-between border-b border-white/10 pb-2">
+            <div className="flex items-center gap-2">
+              <Gauge className="h-3.5 w-3.5 text-primary" />
+              <span className="font-semibold tracking-tight text-white">
+                Estatísticas em Tempo Real
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowStats(false)}
+              aria-label="Fechar estatísticas da transmissão"
+              className="grid h-6 w-6 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <dl className="mt-2.5 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-white/5 bg-slate-900/70 px-2.5 py-2">
+              <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                Resolução
+              </dt>
+              <dd className="mt-0.5 flex items-center gap-1.5 font-mono text-xs font-semibold text-white">
+                <span>
+                  {liveStats.width && liveStats.height
+                    ? `${liveStats.width}×${liveStats.height}`
+                    : '—'}
+                </span>
+                {liveStats.width && liveStats.height && (
+                  <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-semibold text-primary">
+                    {formatResolutionBadge(liveStats.width, liveStats.height)}
+                  </span>
+                )}
+              </dd>
+            </div>
+
+            <div className="rounded-xl border border-white/5 bg-slate-900/70 px-2.5 py-2">
+              <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                Taxa de Quadros
+              </dt>
+              <dd className="mt-0.5 font-mono text-xs font-semibold text-emerald-300">
+                {liveStats.fps !== null ? `${liveStats.fps} FPS` : '—'}
+              </dd>
+            </div>
+
+            <div className="rounded-xl border border-white/5 bg-slate-900/70 px-2.5 py-2">
+              <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                Bitrate {isHost ? '(Envio)' : '(Recepção)'}
+              </dt>
+              <dd className="mt-0.5 font-mono text-xs font-semibold text-blue-300">
+                {liveStats.bitrateMbps !== null ? `${liveStats.bitrateMbps} Mbps` : 'Local'}
+              </dd>
+            </div>
+
+            <div className="rounded-xl border border-white/5 bg-slate-900/70 px-2.5 py-2">
+              <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                Codec / Latência
+              </dt>
+              <dd className="mt-0.5 font-mono text-xs font-semibold text-slate-100">
+                {liveStats.codec ?? 'WebRTC'}
+                {liveStats.rttMs !== null ? ` · ${liveStats.rttMs} ms` : ''}
+              </dd>
+            </div>
+          </dl>
+
+          {!isHost && (liveStats.packetLossPercent !== null || liveStats.jitterMs !== null) && (
+            <div className="mt-2 flex items-center justify-between rounded-xl border border-white/5 bg-slate-900/50 px-2.5 py-1.5 text-[11px] text-slate-400">
+              <span>
+                Perda:{' '}
+                <strong className="font-mono text-slate-200">
+                  {liveStats.packetLossPercent !== null ? `${liveStats.packetLossPercent}%` : '0.0%'}
+                </strong>
+              </span>
+              {liveStats.jitterMs !== null && (
+                <span>
+                  Jitter: <strong className="font-mono text-slate-200">{liveStats.jitterMs} ms</strong>
+                </span>
+              )}
+            </div>
+          )}
+
+          {isHost && liveStats.qualityLimitationReason && liveStats.qualityLimitationReason !== 'none' && (
+            <div className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-200">
+              Limitação detectada: <strong className="uppercase">{liveStats.qualityLimitationReason}</strong>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Strip/Grid de miniaturas e avatares dos participantes no Modo Imersivo (Estilo Discord) */}
       {isFullscreen && participants.length > 0 && (
@@ -489,15 +669,31 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
           setShowControls(true);
         }}
       >
-        {/* Esquerda: Badge Ao Vivo e Controle de Volume / Mudo */}
+        {/* Esquerda: Badge Ao Vivo (clicável para abrir Estatísticas) e Controle de Volume / Mudo */}
         <div className="flex items-center gap-2.5 sm:gap-3">
-          <div className="flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/15 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-red-300 shadow-sm backdrop-blur-md select-none">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-            </span>
-            <span>AO VIVO</span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowStats((prev) => !prev);
+                  resetHideTimer();
+                }}
+                aria-pressed={showStats}
+                aria-label="Alternar estatísticas da transmissão em tempo real"
+                className="flex items-center gap-1.5 rounded-full border border-red-500/25 bg-red-500/15 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-red-300 shadow-sm backdrop-blur-md transition-colors hover:border-red-400/40 hover:bg-red-500/25"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                </span>
+                <span>AO VIVO</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Clique para {showStats ? 'ocultar' : 'ver'} estatísticas da transmissão
+            </TooltipContent>
+          </Tooltip>
 
           {/* Botão de Mutar transmissão para o Host no overlay flutuante */}
           {isHost && hasSystemAudio && onToggleSystemAudio && (
@@ -570,10 +766,133 @@ function StreamVideo({ stream, isHost = false, ...restProps }: StreamVideoProps)
           )}
         </div>
 
-        {/* Direita: Top Sounds (Soundboard) e Botão de Modo Tela Cheia */}
+        {/* Direita: Seletor de Qualidade (Host), Estatísticas, Top Sounds, Picture-in-Picture e Tela Cheia */}
         <div className="flex items-center gap-2">
+          {/* Seletor de Qualidade em Tempo Real para o Host */}
+          {isHost && onSetQualityPreset && (
+            <div className="relative">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setQualityMenuOpen((prev) => !prev);
+                      resetHideTimer();
+                    }}
+                    aria-expanded={qualityMenuOpen}
+                    aria-label="Selecionar qualidade da transmissão"
+                    className="h-9 gap-1.5 rounded-xl border border-border/40 bg-slate-900/70 px-3 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-sm transition-colors hover:bg-slate-800 hover:text-white"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
+                    <span>{STREAM_QUALITY_PRESETS[qualityPreset].shortLabel}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Qualidade da transmissão</TooltipContent>
+              </Tooltip>
+
+              {qualityMenuOpen && (
+                <div
+                  role="listbox"
+                  aria-label="Presets de qualidade da transmissão"
+                  className="absolute bottom-full right-0 z-50 mb-2 w-56 overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-xl"
+                >
+                  <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Qualidade da Transmissão
+                  </div>
+                  {STREAM_QUALITY_PRESET_LIST.map((preset) => {
+                    const isSelected = qualityPreset === preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={() => {
+                          onSetQualityPreset(preset.id);
+                          setQualityMenuOpen(false);
+                          resetHideTimer();
+                        }}
+                        className={`flex w-full flex-col items-start rounded-xl px-2.5 py-2 text-left transition-colors ${
+                          isSelected
+                            ? 'bg-primary/15 text-white'
+                            : 'text-slate-300 hover:bg-slate-800/70 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex w-full items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5 text-xs font-semibold">
+                            <span>{preset.label}</span>
+                            <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-semibold text-primary">
+                              {preset.badge}
+                            </span>
+                          </span>
+                          {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}
+                        </div>
+                        <span className="mt-0.5 text-[10px] text-slate-400">
+                          {preset.description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Botão de Estatísticas em Tempo Real ("Modo Nerd") */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setShowStats((prev) => !prev);
+                  resetHideTimer();
+                }}
+                aria-pressed={showStats}
+                aria-label="Estatísticas da transmissão"
+                className={`h-9 w-9 rounded-xl border backdrop-blur-md shadow-sm transition-colors ${
+                  showStats
+                    ? 'border-primary/50 bg-primary/20 text-primary'
+                    : 'border-border/40 bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-slate-100'
+                }`}
+              >
+                <Gauge className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {showStats ? 'Ocultar estatísticas' : 'Estatísticas em tempo real'}
+            </TooltipContent>
+          </Tooltip>
+
           {/* Top Sounds Dropdown para usar na transmissão (abre para CIMA e para a ESQUERDA) */}
           <TopSoundsDropdown placement="top-left" triggerSize="default" />
+
+          {/* Botão Picture-in-Picture (PiP) */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => void togglePictureInPicture()}
+                aria-pressed={isPip}
+                aria-label={isPip ? 'Sair do Picture-in-Picture' : 'Modo Picture-in-Picture'}
+                className={`h-9 w-9 rounded-xl border backdrop-blur-md shadow-sm transition-colors ${
+                  isPip
+                    ? 'border-primary/50 bg-primary/20 text-primary'
+                    : 'border-border/40 bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-slate-100'
+                }`}
+              >
+                <PictureInPicture2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {isPip ? 'Sair do Picture-in-Picture (P)' : 'Picture-in-Picture (P)'}
+            </TooltipContent>
+          </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -636,12 +955,15 @@ export default function RoomPage({
   supportsSystemAudio,
   hasSystemAudio,
   systemAudioEnabled,
+  qualityPreset = '1080p60',
   captureError,
   onLoadSources,
   onPrepareSource,
+  onSetQualityPreset,
   onStartCapture,
   onStopCapture,
   onToggleSystemAudio,
+  getPeerConnections,
   onLeaveRequested,
   onLeave,
   onOpenWelcome,
@@ -1821,6 +2143,9 @@ export default function RoomPage({
                       onToggleSystemAudio={onToggleSystemAudio}
                       isViewerDeafened={isViewerDeafened}
                       onToggleViewerDeafen={setIsViewerDeafened}
+                      qualityPreset={qualityPreset}
+                      onSetQualityPreset={onSetQualityPreset}
+                      getPeerConnections={getPeerConnections}
                     />
                   </div>
                 </>
@@ -1985,7 +2310,11 @@ export default function RoomPage({
                     onClick={() => void onLoadSources()}
                     className="h-8 gap-2 px-3 text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
                   >
-                    <RefreshCw className={`h-3.5 w-3.5 ${isLoadingSources ? 'animate-spin' : ''}`} />
+                    {isLoadingSources ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
                     Atualizar
                   </Button>
                 </TooltipTrigger>
@@ -2005,12 +2334,18 @@ export default function RoomPage({
             )}
 
             {isLoadingSources && filteredSources.length === 0 && (
-              <div role="status" className="flex min-h-64 flex-col items-center justify-center text-center">
-                <span className="grid h-12 w-12 place-items-center rounded-xl border border-border/40 bg-slate-800/70 text-blue-300">
-                  <RefreshCw className="h-5 w-5 animate-spin" />
-                </span>
-                <p className="mt-4 text-sm font-medium text-slate-200">Buscando {sourceKind === 'screen' ? 'telas' : 'janelas'}…</p>
-                <p className="mt-1 text-xs text-slate-500">Identificando janelas e monitores ativos no sistema.</p>
+              <div role="status" className="flex min-h-64 flex-col items-center justify-center gap-3.5 text-center">
+                <div className="flex h-10 w-10 items-center justify-center text-primary">
+                  <Loader2 className="h-7 w-7 animate-spin" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-semibold tracking-tight text-slate-100">
+                    Buscando {sourceKind === 'screen' ? 'telas' : 'janelas'}…
+                  </p>
+                  <p className="mt-1 max-w-xs text-xs leading-normal text-slate-400">
+                    Identificando janelas e monitores ativos no sistema.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -2067,7 +2402,34 @@ export default function RoomPage({
           </div>
 
           <div className="flex flex-col-reverse gap-3 border-t border-border/40 bg-slate-950/40 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="self-center text-xs text-slate-500">Qualidade inicial: até 720p · 30 FPS</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-slate-400">Qualidade:</span>
+              <div
+                role="radiogroup"
+                aria-label="Qualidade da transmissão"
+                className="inline-flex rounded-xl border border-border/40 bg-slate-950/70 p-1"
+              >
+                {STREAM_QUALITY_PRESET_LIST.map((preset) => {
+                  const isActive = qualityPreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={isActive}
+                      onClick={() => onSetQualityPreset?.(preset.id)}
+                      className={`inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors ${
+                        isActive
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                      }`}
+                    >
+                      <span>{preset.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div className="flex justify-end gap-2.5">
               <Button type="button" variant="ghost" onClick={closeSourcePicker}>
                 Cancelar
