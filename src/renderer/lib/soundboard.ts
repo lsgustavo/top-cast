@@ -65,6 +65,7 @@ export function saveSoundboardVolume(volume: number): void {
 // Gerenciador de reprodução de áudio do soundboard
 class SoundboardManager {
   private activeAudios = new Map<string, HTMLAudioElement>();
+  private localActiveClipIds = new Set<string>();
   private activeListeners = new Set<(activeIds: string[]) => void>();
   private playListeners = new Set<(clip: SoundboardClip, volume: number) => void>();
   private stopListeners = new Set<(clipId: string) => void>();
@@ -97,8 +98,8 @@ class SoundboardManager {
   }
 
   /**
-   * Retorna um MediaStreamTrack de áudio contínuo (com ganho equalizado) onde todos
-   * os efeitos do Top-Sounds são roteados em tempo real para mixagem na transmissão WebRTC.
+   * Mantido para compatibilidade de API.
+   * Retorna um MediaStreamTrack de áudio silencioso se solicitado.
    */
   public getBroadcastAudioTrack(): MediaStreamTrack | null {
     if (typeof window === 'undefined') return null;
@@ -109,11 +110,10 @@ class SoundboardManager {
       this.audioContext = new AudioCtx({ sampleRate: 48000 });
       this.broadcastDestination = this.audioContext.createMediaStreamDestination();
       this.broadcastMasterGain = this.audioContext.createGain();
-      // Ganho equalizado (headroom balanceado para não clipar junto ao áudio do sistema)
-      this.broadcastMasterGain.gain.value = 0.85;
+      this.broadcastMasterGain.gain.value = 0;
       this.broadcastMasterGain.connect(this.broadcastDestination);
 
-      // Oscilador silencioso mantém a track ativa para mixagem WebRTC contínua
+      // Oscilador silencioso
       const silentGain = this.audioContext.createGain();
       silentGain.gain.value = 0;
       const osc = this.audioContext.createOscillator();
@@ -129,65 +129,13 @@ class SoundboardManager {
     return this.broadcastDestination?.stream.getAudioTracks()[0] ?? null;
   }
 
-  private async routeClipToBroadcastBus(clip: SoundboardClip, volume: number): Promise<void> {
-    if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
-    try {
-      this.getBroadcastAudioTrack();
-      const ctx = this.audioContext;
-      const masterGain = this.broadcastMasterGain;
-      if (!ctx || !masterGain) return;
-
-      if (ctx.state === 'suspended') {
-        await ctx.resume().catch(() => undefined);
-      }
-
-      let audioBuffer = this.decodedBufferCache.get(clip.id);
-      if (!audioBuffer) {
-        const response = await window.fetch(clip.src);
-        if (!response.ok) return;
-        const arrayBuffer = await response.arrayBuffer();
-        audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-        this.decodedBufferCache.set(clip.id, audioBuffer);
-      }
-
-      // Para nó anterior do mesmo clip se houver
-      const prevNode = this.activeWebAudioNodes.get(clip.id);
-      if (prevNode) {
-        try {
-          prevNode.source.stop();
-          prevNode.source.disconnect();
-          prevNode.gain.disconnect();
-        } catch {
-          // ignore
-        }
-        this.activeWebAudioNodes.delete(clip.id);
-      }
-
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      const clipGain = ctx.createGain();
-      // Equalização suave de ganho (0.0 a 1.0)
-      clipGain.gain.value = Math.max(0, Math.min(1, volume));
-      source.connect(clipGain);
-      clipGain.connect(masterGain);
-
-      this.activeWebAudioNodes.set(clip.id, { source, gain: clipGain });
-      source.onended = () => {
-        const current = this.activeWebAudioNodes.get(clip.id);
-        if (current?.source === source) {
-          this.activeWebAudioNodes.delete(clip.id);
-        }
-        try {
-          source.disconnect();
-          clipGain.disconnect();
-        } catch {
-          // ignore
-        }
-      };
-      source.start(0);
-    } catch {
-      // Ignora em ambientes de teste ou se fetch falhar
-    }
+  /**
+   * Mantido para compatibilidade.
+   * Isolamento rigoroso: efeitos do Top-Sounds NUNCA são injetados na transmissão de tela,
+   * garantindo que trafeguem exclusivamente pelo canal de sinalização e nunca gerem eco ou duplicação.
+   */
+  public async routeClipToBroadcastBus(_clip: SoundboardClip, _volume: number): Promise<void> {
+    return Promise.resolve();
   }
 
   private notify(): void {
@@ -197,12 +145,23 @@ class SoundboardManager {
     }
   }
 
+  /**
+   * Retorna estritamente os clipes ativos acionados localmente pelo usuário atual.
+   * Feedbacks visuais (ícone pulsante, ping, equalizador no menu) ficam restritos a quem acionou o efeito.
+   */
   public getActiveClipIds(): string[] {
-    return Array.from(this.activeAudios.keys());
+    return Array.from(this.localActiveClipIds);
   }
 
   public isPlaying(clipId: string): boolean {
-    return this.activeAudios.has(clipId);
+    return this.localActiveClipIds.has(clipId);
+  }
+
+  /**
+   * Retorna todos os clipes atualmente com áudio em reprodução (local ou remoto).
+   */
+  public getAllActiveClipIds(): string[] {
+    return Array.from(this.activeAudios.keys());
   }
 
   public play(clip: SoundboardClip, volume = getSoundboardVolume(), options?: { remote?: boolean }): void {
@@ -211,18 +170,18 @@ class SoundboardManager {
     }
 
     const clampedVolume = Math.max(0, Math.min(1, volume));
+    const isRemote = Boolean(options?.remote);
 
     // Se já estiver tocando esse som, para e reinicia
     this.stop(clip.id, { remote: true });
 
-    if (!options?.remote) {
+    // Apenas quem acionou localmente o efeito recebe feedbacks visuais e dispara para a sala
+    if (!isRemote) {
+      this.localActiveClipIds.add(clip.id);
       for (const listener of this.playListeners) {
         listener(clip, clampedVolume);
       }
     }
-
-    // Roteia também para o bus WebAudio da stream de transmissão com ganho equalizado
-    void this.routeClipToBroadcastBus(clip, clampedVolume);
 
     try {
       const audio = new window.Audio(clip.src);
@@ -230,6 +189,7 @@ class SoundboardManager {
 
       const onEnd = () => {
         this.activeAudios.delete(clip.id);
+        this.localActiveClipIds.delete(clip.id);
         this.notify();
       };
 
@@ -242,10 +202,13 @@ class SoundboardManager {
       void audio.play().catch((err: unknown) => {
         console.warn(`[Soundboard] Falha ao reproduzir ${clip.name}:`, err);
         this.activeAudios.delete(clip.id);
+        this.localActiveClipIds.delete(clip.id);
         this.notify();
       });
     } catch (err) {
       console.warn(`[Soundboard] Erro ao instanciar áudio para ${clip.name}:`, err);
+      this.localActiveClipIds.delete(clip.id);
+      this.notify();
     }
   }
 
@@ -262,6 +225,8 @@ class SoundboardManager {
       this.activeWebAudioNodes.delete(clipId);
     }
 
+    this.localActiveClipIds.delete(clipId);
+
     const audio = this.activeAudios.get(clipId);
     if (audio) {
       try {
@@ -271,8 +236,8 @@ class SoundboardManager {
         // ignorar
       }
       this.activeAudios.delete(clipId);
-      this.notify();
     }
+    this.notify();
 
     if (!options?.remote) {
       for (const listener of this.stopListeners) {
@@ -297,6 +262,8 @@ class SoundboardManager {
       }
     }
     this.activeWebAudioNodes.clear();
+
+    this.localActiveClipIds.clear();
 
     for (const [, audio] of this.activeAudios) {
       try {

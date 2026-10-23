@@ -365,12 +365,13 @@ export function useScreenCapture() {
         rawSystemTrack = newProcessAudioController.track;
       }
 
-      // Roteia e mixa a faixa de áudio do sistema com o bus de áudio do Top-Sounds (ganho equalizado)
-      const soundboardTrack = soundboardManager.getBroadcastAudioTrack();
+      // Isolamento estrito de áudio: os efeitos do Top-Sounds NUNCA são mixados na faixa de transmissão
+      // da tela compartilhada para evitar eco, duplicação e retransmissão indevida.
+      const soundboardTrack: MediaStreamTrack | null = null;
       let newBroadcastMix: BroadcastAudioMixController | null = null;
       let finalBroadcastAudioTrack: MediaStreamTrack | null = rawSystemTrack;
 
-      if (rawSystemTrack || soundboardTrack) {
+      if (rawSystemTrack) {
         newBroadcastMix = createBroadcastAudioMix(rawSystemTrack, soundboardTrack);
         if (newBroadcastMix) {
           for (const existingAudio of stream.getAudioTracks()) {
@@ -378,7 +379,7 @@ export function useScreenCapture() {
           }
           stream.addTrack(newBroadcastMix.outputTrack);
           finalBroadcastAudioTrack = newBroadcastMix.outputTrack;
-        } else if (rawSystemTrack && !stream.getAudioTracks().includes(rawSystemTrack)) {
+        } else if (!stream.getAudioTracks().includes(rawSystemTrack)) {
           stream.addTrack(rawSystemTrack);
           finalBroadcastAudioTrack = rawSystemTrack;
         }

@@ -164,4 +164,76 @@ describe('Soundboard & Top Sounds (Discord-style)', () => {
     assert.ok(topSoundsDropdownContent.includes('onPointerDown'));
     assert.ok(topSoundsDropdownContent.includes('e?.stopPropagation()'));
   });
+
+  it('isolates visual feedbacks to the local user and prevents soundboard retransmission in screen capture', () => {
+    // 1. Mock de window.Audio para testar play local vs remoto
+    const originalWindow = globalThis.window;
+    class MockAudio {
+      src: string;
+      volume = 1;
+      constructor(src: string) {
+        this.src = src;
+      }
+      play() { return Promise.resolve(); }
+      pause() {}
+      addEventListener() {}
+      removeEventListener() {}
+    }
+
+    (globalThis as unknown as { window: unknown }).window = {
+      Audio: MockAudio,
+      AudioContext: class {
+        state = 'running';
+        createMediaStreamDestination() { return { stream: { getAudioTracks: () => [{}] } }; }
+        createGain() { return { gain: { value: 0 }, connect: () => {} }; }
+        createOscillator() { return { connect: () => {}, start: () => {} }; }
+        resume() { return Promise.resolve(); }
+      },
+    };
+
+    try {
+      const activeStates: string[][] = [];
+      const unsub = soundboardManager.subscribe((ids) => {
+        activeStates.push([...ids]);
+      });
+
+      let playListenerCalls = 0;
+      const unsubPlay = soundboardManager.onClipPlay(() => {
+        playListenerCalls++;
+      });
+
+      const clip = SOUNDBOARD_CLIPS[0];
+
+      // Cenário A: Reprodução Remota (outros participantes recebendo via socket)
+      // Não deve gerar feedback visual local (activeClipIds vazio) e não deve re-emitir onClipPlay
+      soundboardManager.play(clip, 0.8, { remote: true });
+      assert.equal(playListenerCalls, 0, 'remote play must NOT trigger onClipPlay (avoids socket echo loop)');
+      assert.equal(soundboardManager.getActiveClipIds().length, 0, 'remote play must NOT register as active local clip');
+      assert.equal(soundboardManager.isPlaying(clip.id), false, 'remote play isPlaying must be false for local UI');
+
+      // Cenário B: Reprodução Local (usuário que acionou o Top-Sound)
+      // Deve registrar nos activeClipIds locais para exibir animações/feedback na interface dele
+      soundboardManager.play(clip, 0.8);
+      assert.equal(playListenerCalls, 1, 'local play must trigger onClipPlay for room broadcast');
+      assert.deepEqual(soundboardManager.getActiveClipIds(), [clip.id], 'local play must be registered in activeClipIds');
+      assert.equal(soundboardManager.isPlaying(clip.id), true, 'local play isPlaying must be true');
+
+      // Ao parar, remove dos clipes ativos
+      soundboardManager.stop(clip.id);
+      assert.equal(soundboardManager.getActiveClipIds().length, 0);
+
+      unsub();
+      unsubPlay();
+    } finally {
+      (globalThis as unknown as { window: unknown }).window = originalWindow;
+    }
+
+    // 2. Isolamento de áudio da transmissão de tela em use-screen-capture.ts
+    const useScreenCapturePath = path.resolve('src/renderer/features/streaming/use-screen-capture.ts');
+    const useScreenCaptureContent = fs.readFileSync(useScreenCapturePath, 'utf8');
+    assert.ok(
+      useScreenCaptureContent.includes('const soundboardTrack: MediaStreamTrack | null = null'),
+      'soundboard track must be isolated from the screen broadcast mix to prevent audio echo and retransmission',
+    );
+  });
 });
