@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Slider } from '../components/ui/slider';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { SettingsDialog } from '../components/settings-dialog';
 import { SoundboardDialog } from '../components/soundboard-dialog';
 import { TopSoundsDropdown } from '../components/top-sounds-dropdown';
@@ -1147,6 +1147,15 @@ export default function RoomPage({
   const isResizingRef = useRef(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(sidebarWidth);
+  const resizeRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resizeRafRef.current !== null) {
+        cancelAnimationFrame(resizeRafRef.current);
+      }
+    };
+  }, []);
 
   function clampSidebarWidth(width: number): number {
     const maxAllowed = Math.min(
@@ -1170,13 +1179,24 @@ export default function RoomPage({
 
   function handleResizeMove(event: React.PointerEvent<HTMLDivElement>) {
     if (!isResizingRef.current) return;
-    const deltaX = event.clientX - startXRef.current;
-    const nextWidth = clampSidebarWidth(startWidthRef.current + deltaX);
-    setSidebarWidth(nextWidth);
+    const clientX = event.clientX;
+    if (resizeRafRef.current !== null) {
+      cancelAnimationFrame(resizeRafRef.current);
+    }
+    resizeRafRef.current = requestAnimationFrame(() => {
+      const deltaX = clientX - startXRef.current;
+      const nextWidth = clampSidebarWidth(startWidthRef.current + deltaX);
+      setSidebarWidth(nextWidth);
+      resizeRafRef.current = null;
+    });
   }
 
   function handleResizeEnd(event: React.PointerEvent<HTMLDivElement>) {
     if (!isResizingRef.current) return;
+    if (resizeRafRef.current !== null) {
+      cancelAnimationFrame(resizeRafRef.current);
+      resizeRafRef.current = null;
+    }
     isResizingRef.current = false;
     setIsResizing(false);
     try {
@@ -1616,27 +1636,160 @@ export default function RoomPage({
         style={{
           ['--sidebar-width' as string]: `${sidebarWidth}px`,
         }}
-        className={`relative z-10 flex w-full shrink-0 flex-col border-b border-border/40 bg-slate-950/70 backdrop-blur-xl lg:h-screen lg:min-h-0 lg:border-b-0 lg:border-r border-border/40 shadow-2xl glass-surface-primary ${
+        className={`relative z-10 flex w-full shrink-0 flex-col border-b border-border/40 bg-slate-950/70 backdrop-blur-xl lg:h-screen lg:min-h-0 lg:overflow-hidden lg:border-b-0 lg:border-r border-border/40 shadow-2xl glass-surface-primary ${
           isResizing
             ? 'transition-none select-none'
-            : 'transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
+            : 'transition-[width] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none'
         } ${
           isStreamFullscreen
             ? 'hidden'
             : isSidebarCollapsed
-              ? 'h-0 max-h-0 p-0 border-b-0 opacity-0 pointer-events-none select-none overflow-hidden lg:h-screen lg:max-h-none lg:w-0 lg:min-w-0 lg:max-w-0 lg:border-r-0 lg:p-0 lg:opacity-0 lg:-translate-x-2'
-              : 'p-4 sm:p-5 opacity-100 lg:w-[var(--sidebar-width)] lg:opacity-100 lg:translate-x-0'
+              ? 'h-0 max-h-0 p-0 border-b-0 opacity-0 pointer-events-none select-none overflow-hidden lg:h-screen lg:max-h-none lg:w-[68px] lg:min-w-[68px] lg:border-r lg:p-0 lg:opacity-100 lg:pointer-events-auto'
+              : 'p-0 opacity-100 lg:w-[var(--sidebar-width)] lg:opacity-100'
         }`}
       >
-        <div className="flex h-full w-full min-w-0 flex-col overflow-x-hidden">
-          <div className="flex items-center gap-3 border-b border-primary/15 pb-4 [-webkit-app-region:drag]">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary shadow-sm">
-              <Radio className="h-5 w-5" />
+        {/* Faixa compacta (mini-rail): avatares dos participantes visíveis com a sidebar recolhida */}
+        <div
+          aria-hidden={!isSidebarCollapsed}
+          className={`absolute inset-0 z-20 hidden flex-col items-center py-4 transition-opacity duration-200 motion-reduce:transition-none lg:flex ${
+            isSidebarCollapsed
+              ? 'opacity-100 pointer-events-auto'
+              : 'opacity-0 pointer-events-none select-none'
+          }`}
+        >
+          {/* Botão de alternar integrado à sidebar no topo */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsSidebarCollapsed(false)}
+                aria-pressed={isSidebarCollapsed}
+                aria-label="Expandir barra lateral"
+                className="h-9 w-9 shrink-0 rounded-xl border border-border/40 bg-slate-900/60 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100 hover:border-primary/40 [-webkit-app-region:no-drag]"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={12}>
+              Expandir barra lateral (T)
+            </TooltipContent>
+          </Tooltip>
+
+          <div className="my-3 w-8 border-b border-border/40" />
+
+          {/* Avatares dos participantes com status e hover revelando o nome */}
+          <TooltipProvider delayDuration={50} skipDelayDuration={100}>
+            <ul
+              aria-label="Participantes"
+              className="flex w-full flex-1 flex-col items-center gap-2.5 overflow-y-auto overflow-x-hidden px-1.5 py-1 select-none"
+            >
+              {room.participants.map((participant) => {
+                const isSelf = participant.id === selfParticipantId;
+                const railPresenceColor = participant.presence === 'available'
+                  ? 'bg-emerald-400'
+                  : participant.presence === 'away' ? 'bg-amber-300' : 'bg-red-400';
+                const railPresenceLabel = participant.presence === 'available'
+                  ? 'Online'
+                  : participant.presence === 'away' ? 'Ausente' : 'Ocupado';
+                const isParticipantPresenter = participant.id === activePresenterId;
+
+                return (
+                  <li key={participant.id} className="shrink-0">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          tabIndex={isSidebarCollapsed ? 0 : -1}
+                          role="img"
+                          aria-label={`${participant.displayName}, ${railPresenceLabel}`}
+                          className="group relative h-10 w-10 cursor-pointer rounded-xl outline-none ring-1 ring-border/40 transition-all duration-200 hover:scale-110 hover:ring-2 hover:ring-primary/60 hover:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/60 motion-reduce:transition-none"
+                        >
+                          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-xl bg-slate-950/80 shadow-sm">
+                            <VoxelAvatar
+                              displayName={participant.displayName}
+                              seed={
+                                isSelf && localAvatarSeedOverride
+                                  ? localAvatarSeedOverride
+                                  : participant.avatarSeed
+                              }
+                            />
+                          </div>
+                          <span
+                            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-950 shadow-sm ${railPresenceColor}`}
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={12}>
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-slate-100">
+                              {participant.displayName}
+                            </span>
+                            {isSelf && (
+                              <span className="rounded bg-primary/20 px-1 py-0.2 text-[10px] font-medium text-primary-200">
+                                você
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                            <span className={`inline-block h-2 w-2 rounded-full ${railPresenceColor}`} />
+                            <span>{railPresenceLabel}</span>
+                            {isParticipantPresenter && (
+                              <span className="text-primary-300">· Apresentador</span>
+                            )}
+                            {!isParticipantPresenter && participant.role === 'host' && (
+                              <span className="text-amber-300/90">· Anfitrião</span>
+                            )}
+                          </div>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </li>
+                );
+              })}
+            </ul>
+          </TooltipProvider>
+        </div>
+
+        {/* Conteúdo completo da barra lateral quando expandida */}
+        <div
+          className={`flex h-full w-full min-w-0 flex-col overflow-x-hidden p-4 sm:p-5 lg:w-[var(--sidebar-width)] lg:shrink-0 transition-opacity duration-200 motion-reduce:transition-none ${
+            isSidebarCollapsed
+              ? 'lg:opacity-0 lg:pointer-events-none lg:select-none'
+              : 'opacity-100 pointer-events-auto'
+          }`}
+          aria-hidden={isSidebarCollapsed || undefined}
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-primary/15 pb-4 [-webkit-app-region:drag]">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary shadow-sm">
+                <Radio className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="truncate text-sm font-semibold tracking-tight text-slate-100">TopCast</h1>
+                <p className="mt-0.5 text-xs text-slate-400">Sala de transmissão</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-sm font-semibold tracking-tight text-slate-100">TopCast</h1>
-              <p className="mt-0.5 text-xs text-slate-400">Sala de transmissão</p>
-            </div>
+            {/* Botão de alternar integrado à sidebar no cabeçalho */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  aria-pressed={isSidebarCollapsed}
+                  aria-label="Modo Teatro (recolher barra lateral)"
+                  className="h-9 w-9 shrink-0 rounded-xl border border-border/40 bg-slate-900/60 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100 hover:border-primary/40 [-webkit-app-region:no-drag]"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                Modo Teatro: Recolher barra lateral (T)
+              </TooltipContent>
+            </Tooltip>
           </div>
 
         {/* Card do Convite */}
@@ -2170,12 +2323,12 @@ export default function RoomPage({
               onPointerCancel={handleResizeEnd}
               onDoubleClick={handleResetSidebarWidth}
               onKeyDown={handleResizeKeyDown}
-              className={`group absolute -right-1.5 top-0 bottom-0 z-20 w-3 cursor-col-resize select-none touch-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+              className={`group absolute right-0 top-0 bottom-0 z-20 w-3 cursor-col-resize select-none touch-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                 isSidebarCollapsed ? 'hidden' : 'hidden lg:block'
               }`}
             >
               <div
-                className={`mx-auto h-full w-[2px] transition-colors duration-150 ${
+                className={`ml-auto h-full w-[2px] transition-colors duration-150 ${
                   isResizing
                     ? 'bg-primary'
                     : 'bg-transparent group-hover:bg-primary/50 group-focus-visible:bg-primary'
@@ -2190,9 +2343,20 @@ export default function RoomPage({
       </aside>
 
       {/* Área Principal */}
-      <div className={`relative mx-auto flex min-h-full w-full flex-1 flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isStreamFullscreen ? 'max-w-none p-0' : `${isSidebarCollapsed ? 'max-w-none' : 'max-w-[1600px]'} px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5`}`}>
+      <div
+        className={`relative mx-auto flex min-h-full w-full flex-1 flex-col ${
+          isResizing
+            ? 'transition-none select-none'
+            : 'transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none'
+        } ${
+          isStreamFullscreen
+            ? 'max-w-none p-0'
+            : `${isSidebarCollapsed ? 'max-w-none' : 'max-w-[1600px]'} px-4 py-4 sm:px-6 sm:py-5 lg:min-h-0 lg:px-6 lg:py-5`
+        }`}
+      >
         <header className={`flex shrink-0 items-center justify-between gap-4 border-b border-border/40 pb-4 [-webkit-app-region:drag] ${isStreamFullscreen ? 'hidden' : ''}`}>
           <div className="flex items-center gap-3">
+            {/* Botão de alternar em telas menores onde a sidebar fecha por completo */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -2202,7 +2366,7 @@ export default function RoomPage({
                   onClick={() => setIsSidebarCollapsed((prev) => !prev)}
                   aria-pressed={isSidebarCollapsed}
                   aria-label={isSidebarCollapsed ? 'Expandir barra lateral' : 'Modo Teatro (recolher barra lateral)'}
-                  className={`h-9 w-9 shrink-0 rounded-xl border transition-colors [-webkit-app-region:no-drag] ${
+                  className={`h-9 w-9 shrink-0 rounded-xl border transition-colors lg:hidden [-webkit-app-region:no-drag] ${
                     isSidebarCollapsed
                       ? 'border-primary/40 bg-primary/15 text-primary hover:bg-primary/25'
                       : 'border-border/40 bg-slate-900/60 text-slate-400 hover:bg-slate-800 hover:text-slate-100'
