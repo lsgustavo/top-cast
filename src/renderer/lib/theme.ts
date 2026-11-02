@@ -1,14 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export type ThemeId =
-  | 'graphite'
-  | 'aurora-pearl'
-  | 'cyber-blue'
-  | 'midnight-violet'
-  | 'emerald-matrix'
-  | 'sunset-amber'
-  | 'nordic-cyan'
-  | 'crimson-rose';
+export type ThemeId = 'dark' | 'light';
 
 export interface ThemeOption {
   id: ThemeId;
@@ -22,88 +14,40 @@ export interface ThemeOption {
 
 export const THEME_OPTIONS: readonly ThemeOption[] = [
   {
-    id: 'graphite',
-    name: 'Graphite',
-    description: 'Grafite neutro minimalista com acabamento carbono fosco',
-    primaryColor: '#94a3b8',
-    secondaryColor: '#27272a',
-    bgColor: '#09090b',
-    accentColor: '#cbd5e1',
+    id: 'dark',
+    name: 'Modo Escuro',
+    description: 'Blurple vibrante sobre ardósia escura',
+    primaryColor: '#5865F2',
+    secondaryColor: '#2b2d31',
+    bgColor: '#1e1f22',
+    accentColor: '#7289da',
   },
   {
-    id: 'aurora-pearl',
-    name: 'Aurora Pearl',
-    description: 'Pérola luminosa com brisa índigo suave (Modo Claro)',
-    primaryColor: '#6366f1',
+    id: 'light',
+    name: 'Modo Claro',
+    description: 'Interface límpida e confortável com acentos Blurple refinados',
+    primaryColor: '#4752C4',
     secondaryColor: '#ffffff',
-    bgColor: '#eef2f8',
-    accentColor: '#818cf8',
-  },
-  {
-    id: 'midnight-violet',
-    name: 'Midnight Violet',
-    description: 'Violeta elétrico com fundo obsidiana profundo',
-    primaryColor: '#a855f7',
-    secondaryColor: '#241437',
-    bgColor: '#0d0814',
-    accentColor: '#c084fc',
-  },
-  {
-    id: 'cyber-blue',
-    name: 'Cyber Blue',
-    description: 'Azul cobalto clássico com fundo grafite escuro',
-    primaryColor: '#3b82f6',
-    secondaryColor: '#1e293b',
-    bgColor: '#0b1020',
-    accentColor: '#60a5fa',
-  },
-  {
-    id: 'emerald-matrix',
-    name: 'Emerald Matrix',
-    description: 'Verde esmeralda vibrante com fundo floresta negra',
-    primaryColor: '#10b981',
-    secondaryColor: '#142a20',
-    bgColor: '#06120d',
-    accentColor: '#34d399',
-  },
-  {
-    id: 'sunset-amber',
-    name: 'Sunset Amber',
-    description: 'Âmbar solar aconchegante com fundo carbono quente',
-    primaryColor: '#f59e0b',
-    secondaryColor: '#2b1b11',
-    bgColor: '#140c08',
-    accentColor: '#fbbf24',
-  },
-  {
-    id: 'nordic-cyan',
-    name: 'Nordic Cyan',
-    description: 'Ciano glacial luminoso com fundo ardósia polar',
-    primaryColor: '#06b6d4',
-    secondaryColor: '#132834',
-    bgColor: '#071116',
-    accentColor: '#22d3ee',
-  },
-  {
-    id: 'crimson-rose',
-    name: 'Crimson Rose',
-    description: 'Vermelho carmim marcante com fundo rubi escuro',
-    primaryColor: '#f43f5e',
-    secondaryColor: '#2e111a',
-    bgColor: '#14070a',
-    accentColor: '#fb7185',
+    bgColor: '#f2f3f5',
+    accentColor: '#5865f2',
   },
 ] as const;
 
-export const DEFAULT_THEME: ThemeId = 'graphite';
+export const DEFAULT_THEME: ThemeId = 'dark';
 export const THEME_STORAGE_KEY = 'topcast:theme';
 
 export function getSavedTheme(): ThemeId {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
-      const saved = window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null;
+      const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === 'light' || saved === 'aurora-pearl') {
+        return 'light';
+      }
+      if (saved === 'dark' || saved === 'graphite' || saved === 'cyber-blue') {
+        return 'dark';
+      }
       if (saved && THEME_OPTIONS.some((theme) => theme.id === saved)) {
-        return saved;
+        return saved as ThemeId;
       }
     }
   } catch {
@@ -115,6 +59,11 @@ export function getSavedTheme(): ThemeId {
 export function applyTheme(theme: ThemeId): void {
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }
   try {
     if (typeof window !== 'undefined' && window.localStorage) {

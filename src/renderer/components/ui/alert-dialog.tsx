@@ -8,7 +8,7 @@ const AlertDialogPortal = AlertDialogPrimitive.Portal;
 const AlertDialogOverlay = ({ className, ...props }: AlertDialogPrimitive.AlertDialogOverlayProps) => (
   <AlertDialogPrimitive.Overlay
     className={cn(
-      'fixed inset-0 z-[80] bg-slate-950/70 backdrop-blur-md topcast-dialog-overlay',
+      'fixed inset-0 z-[80] bg-black/60 topcast-dialog-overlay',
       className,
     )}
     {...props}
@@ -30,7 +30,7 @@ const AlertDialogContent = ({
         }
       }}
       className={cn(
-        'fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-slate-950/85 p-0 text-slate-100 shadow-2xl backdrop-blur-xl outline-none topcast-dialog-content glass-surface-elevated',
+        'fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-slate-900 border border-border/40 p-0 text-slate-100 shadow-2xl outline-none topcast-dialog-content glass-surface-elevated',
         className,
       )}
       {...props}
@@ -72,7 +72,7 @@ const AlertDialogDescription = AlertDialogPrimitive.Description;
 const AlertDialogCancel = ({ className, ...props }: AlertDialogPrimitive.AlertDialogCancelProps) => (
   <AlertDialogPrimitive.Cancel
     className={cn(
-      'inline-flex h-9 items-center justify-center rounded-xl border border-border/40 bg-slate-900/60 px-4 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50',
+      'inline-flex h-9 items-center justify-center rounded-xl border border-border/40 bg-slate-900/60 px-4 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 hover:border-slate-600/60 focus-visible:ring-slate-400 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
       className,
     )}
     {...props}

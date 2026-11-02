@@ -272,7 +272,7 @@ export default function HomePage({
         </section>
 
         {/* Perfil do Usuário com Efeito Glass */}
-        <div className="mt-7 rounded-2xl p-4 glass-surface-secondary">
+        <div className="mt-6 rounded-2xl border border-border/25 bg-slate-900/40 p-4 glass-surface-secondary">
           <label htmlFor="display-name" className="mb-2.5 block text-left text-xs font-semibold uppercase tracking-wider text-slate-300">
             Seu Perfil
           </label>
@@ -400,7 +400,7 @@ export default function HomePage({
             className="group relative h-auto w-full justify-between rounded-2xl border border-border/30 bg-slate-900/40 p-4 text-left text-slate-100 shadow-sm backdrop-blur-md transition-all duration-150 hover:bg-slate-900/60 hover:border-border/50 focus-visible:ring-primary disabled:opacity-50"
           >
             <span className="flex items-center gap-3.5">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-900/70 text-slate-200 transition-colors group-hover:bg-slate-800 group-hover:text-white">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
                 <Users className="h-5 w-5" />
               </span>
               <span>

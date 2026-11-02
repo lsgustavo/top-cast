@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Palette, Settings, User } from 'lucide-react';
+import { Check, Moon, Palette, Settings, Sun, User } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -326,10 +326,11 @@ export function SettingsDialog({
               <div
                 role="radiogroup"
                 aria-labelledby="theme-section-title"
-                className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3"
+                className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2"
               >
                 {themes.map((themeOption) => {
                   const isSelected = currentTheme === themeOption.id;
+                  const isDark = themeOption.id === 'dark';
 
                   return (
                     <button
@@ -339,56 +340,81 @@ export function SettingsDialog({
                       aria-checked={isSelected}
                       onClick={() => handleSelectTheme(themeOption.id)}
                       className={cn(
-                        'group relative flex flex-col items-start rounded-xl p-3.5 text-left border transition-all duration-150',
+                        'group relative flex flex-col items-start rounded-xl p-4 text-left border transition-all duration-150',
                         'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                         isSelected
-                          ? 'border-primary/50 bg-primary/10 shadow-sm ring-1 ring-primary/30'
-                          : 'border-border/25 bg-slate-900/40 hover:bg-slate-900/70 hover:border-border/40',
+                          ? 'border-primary/60 bg-primary/10 shadow-xs ring-1 ring-primary/40'
+                          : 'border-border/40 bg-slate-900/40 hover:bg-slate-900/70 hover:border-border/60',
                       )}
                     >
                       {isSelected && (
-                        <span className="absolute right-2.5 top-2.5 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-slate-950">
+                        <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-xs">
                           <Check className="h-3 w-3" />
                         </span>
                       )}
 
+                      {/* Preview Flat / Material */}
                       <div
-                        className="mb-3 flex h-14 w-full items-center justify-between rounded-lg p-2 shadow-inner"
+                        className="mb-3 flex h-16 w-full flex-col justify-between rounded-lg p-2.5 border border-border/30 transition-colors"
                         style={{
                           backgroundColor: themeOption.bgColor,
                         }}
                       >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="grid h-5 w-5 place-items-center rounded text-white text-[11px]"
+                              style={{ backgroundColor: themeOption.primaryColor }}
+                            >
+                              {isDark ? <Moon className="h-3 w-3" /> : <Sun className="h-3 w-3" />}
+                            </span>
+                            <span
+                              className="text-[11px] font-semibold"
+                              style={{ color: isDark ? '#f1f5f9' : '#0f172a' }}
+                            >
+                              {themeOption.name}
+                            </span>
+                          </div>
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: themeOption.primaryColor }}
+                          />
+                        </div>
+
                         <div
-                          className="flex h-full flex-1 items-center gap-2.5 rounded-md px-3"
+                          className="flex items-center gap-2 rounded px-2 py-1 border border-black/5"
                           style={{
                             backgroundColor: themeOption.secondaryColor,
                           }}
                         >
                           <span
-                            className="h-3.5 w-3.5 rounded-full shadow-sm ring-1 ring-white/10"
-                            style={{ backgroundColor: themeOption.primaryColor }}
-                          />
-                          <span
-                            className="h-2.5 w-2.5 rounded-full opacity-90 ring-1 ring-white/10"
+                            className="h-1.5 w-1.5 rounded-full"
                             style={{ backgroundColor: themeOption.accentColor }}
                           />
-                          <div className="flex-1 flex flex-col gap-1">
+                          <div className="flex-1 flex flex-col gap-0.5">
                             <span
-                              className="h-1.5 w-full rounded-full opacity-60"
+                              className="h-1 w-3/4 rounded-full opacity-70"
                               style={{ backgroundColor: themeOption.primaryColor }}
                             />
                             <span
-                              className="h-1 w-2/3 rounded-full opacity-30"
-                              style={{ backgroundColor: themeOption.accentColor }}
+                              className="h-0.5 w-1/2 rounded-full opacity-40"
+                              style={{ backgroundColor: isDark ? '#94a3b8' : '#64748b' }}
                             />
                           </div>
                         </div>
                       </div>
 
-                      <span className="block text-sm font-semibold text-slate-100">
-                        {themeOption.name}
-                      </span>
-                      <span className="mt-1 block text-xs leading-4 text-slate-400 line-clamp-2">
+                      <div className="flex items-center gap-2">
+                        {isDark ? (
+                          <Moon className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
+                        ) : (
+                          <Sun className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
+                        )}
+                        <span className="block text-sm font-semibold text-slate-100">
+                          {themeOption.name}
+                        </span>
+                      </div>
+                      <span className="mt-1 block text-xs leading-4 text-slate-400">
                         {themeOption.description}
                       </span>
                     </button>

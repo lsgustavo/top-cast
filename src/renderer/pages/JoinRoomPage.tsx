@@ -90,7 +90,7 @@ export default function JoinRoomPage({ socket, displayName, onBack, onRoomJoined
             size="sm"
             disabled={submissionState === 'loading'}
             onClick={onBack}
-            className="h-8 gap-2 rounded-xl border border-primary/20 bg-slate-900/60 px-3 text-xs font-medium text-slate-300 backdrop-blur-md transition-all hover:border-primary/40 hover:bg-slate-800 hover:text-white"
+            className="h-8 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-3 text-xs font-medium text-slate-300 transition-all hover:border-border/80 hover:bg-slate-800 hover:text-white"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Voltar</span>

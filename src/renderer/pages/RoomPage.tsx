@@ -19,6 +19,9 @@ import {
   Minimize,
   Monitor,
   MonitorUp,
+  // Legacy sidebar toggle aliases: PanelLeftClose, PanelLeftOpen
+  ChevronsLeft,
+  ChevronsRight,
   PanelLeftClose,
   PanelLeftOpen,
   Pause,
@@ -1130,7 +1133,7 @@ export default function RoomPage({
   const toastTimerRef = useRef<number | null>(null);
   const [isSourcePickerOpen, setIsSourcePickerOpen] = useState(false);
   const [presenceSelectOpen, setPresenceSelectOpen] = useState(false);
-  const presenceCloseTimeoutRef = useRef<number | null>(null);
+  const presenceContainerRef = useRef<HTMLDivElement | null>(null);
   const [localAvatarSeedOverride, setLocalAvatarSeedOverride] = useState<string | null>(null);
   const [isStartingLocally, setIsStartingLocally] = useState(false);
   const [sourceKind, setSourceKind] = useState<CaptureSource['kind']>('screen');
@@ -1337,11 +1340,25 @@ export default function RoomPage({
       if (toastTimerRef.current !== null) {
         window.clearTimeout(toastTimerRef.current);
       }
-      if (presenceCloseTimeoutRef.current !== null) {
-        window.clearTimeout(presenceCloseTimeoutRef.current);
-      }
     };
   }, []);
+
+  // Fecha o dropdown de status ao clicar fora
+  useEffect(() => {
+    if (!presenceSelectOpen) return;
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      if (
+        presenceContainerRef.current &&
+        !presenceContainerRef.current.contains(event.target as Node)
+      ) {
+        setPresenceSelectOpen(false);
+      }
+    }
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside);
+    };
+  }, [presenceSelectOpen]);
 
   // Sincroniza estado de tela cheia disparado pelo StreamVideo para eliminar contenção CSS
   useEffect(() => {
@@ -1437,23 +1454,6 @@ export default function RoomPage({
     }
   };
 
-  function handlePresenceMouseEnter() {
-    if (presenceCloseTimeoutRef.current !== null) {
-      window.clearTimeout(presenceCloseTimeoutRef.current);
-      presenceCloseTimeoutRef.current = null;
-    }
-    setPresenceSelectOpen(true);
-  }
-
-  function handlePresenceMouseLeave() {
-    if (presenceCloseTimeoutRef.current !== null) {
-      window.clearTimeout(presenceCloseTimeoutRef.current);
-    }
-    presenceCloseTimeoutRef.current = window.setTimeout(() => {
-      setPresenceSelectOpen(false);
-      presenceCloseTimeoutRef.current = null;
-    }, 180);
-  }
 
   async function handleCopyCode() {
     let duration = 2_000;
@@ -1667,9 +1667,9 @@ export default function RoomPage({
                 onClick={() => setIsSidebarCollapsed(false)}
                 aria-pressed={isSidebarCollapsed}
                 aria-label="Expandir barra lateral"
-                className="h-9 w-9 shrink-0 rounded-xl border border-border/40 bg-slate-900/60 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100 hover:border-primary/40 [-webkit-app-region:no-drag]"
+                className="h-9 w-9 shrink-0 rounded-xl border border-border/40 bg-slate-900/60 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100 hover:border-border/80 [-webkit-app-region:no-drag]"
               >
-                <PanelLeftOpen className="h-4 w-4" />
+                <ChevronsRight className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={12}>
@@ -1781,9 +1781,9 @@ export default function RoomPage({
                   onClick={() => setIsSidebarCollapsed(true)}
                   aria-pressed={isSidebarCollapsed}
                   aria-label="Modo Teatro (recolher barra lateral)"
-                  className="h-9 w-9 shrink-0 rounded-xl border border-border/40 bg-slate-900/60 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100 hover:border-primary/40 [-webkit-app-region:no-drag]"
+                  className="h-9 w-9 shrink-0 rounded-xl border border-border/40 bg-slate-900/60 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100 hover:border-border/80 [-webkit-app-region:no-drag]"
                 >
-                  <PanelLeftClose className="h-4 w-4" />
+                  <ChevronsLeft className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">
@@ -1908,7 +1908,7 @@ export default function RoomPage({
                               void handleSetPresenter(participant.id);
                             }}
                             aria-label={`Passar transmissão para ${participant.displayName}`}
-                            className="grid h-6 w-6 place-items-center rounded-lg border border-border/40 bg-slate-950/70 text-slate-400 transition-colors hover:border-primary/40 hover:bg-primary/15 hover:text-primary"
+                            className="grid h-6 w-6 place-items-center rounded-lg border border-border/40 bg-slate-950/70 text-slate-400 transition-colors hover:border-border/80 hover:bg-primary/15 hover:text-primary"
                           >
                             <MonitorUp className="h-3.5 w-3.5" />
                           </button>
@@ -2171,8 +2171,7 @@ export default function RoomPage({
                 return (
                   <div
                     key={participant.id}
-                    onMouseEnter={handlePresenceMouseEnter}
-                    onMouseLeave={handlePresenceMouseLeave}
+                    ref={presenceContainerRef}
                     className="relative"
                   >
                     {/* Botão Card do Perfil */}
@@ -2373,9 +2372,9 @@ export default function RoomPage({
                   }`}
                 >
                   {isSidebarCollapsed ? (
-                    <PanelLeftOpen className="h-4 w-4" />
+                    <ChevronsRight className="h-4 w-4" />
                   ) : (
-                    <PanelLeftClose className="h-4 w-4" />
+                    <ChevronsLeft className="h-4 w-4" />
                   )}
                 </Button>
               </TooltipTrigger>
@@ -2443,12 +2442,7 @@ export default function RoomPage({
                     Encerrar sala para todos os participantes
                   </TooltipContent>
                 </Tooltip>
-                <AlertDialogContent className="max-w-md overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl backdrop-blur-xl sm:max-w-md">
-                  {/* Luz ambiente superior suave */}
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -top-24 left-1/2 h-48 w-full -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-500/15 via-red-500/5 to-transparent blur-2xl"
-                  />
+                <AlertDialogContent className="max-w-md overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl sm:max-w-md">
 
                   {/* Header com borda inferior igual aos outros dialogs */}
                   <div className="relative z-10 border-b border-border/40 px-6 py-5">
@@ -2480,7 +2474,7 @@ export default function RoomPage({
 
                   {/* Footer padronizado com os botões do sistema */}
                   <div className="relative z-10 flex flex-col-reverse gap-2.5 border-t border-border/40 bg-slate-950/40 px-6 py-4 sm:flex-row sm:justify-end">
-                    <AlertDialogCancel className="w-full sm:w-auto h-9 rounded-xl border border-border/40 bg-slate-900/60 px-4 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100 focus-visible:ring-primary">
+                    <AlertDialogCancel className="w-full sm:w-auto h-9 rounded-xl border border-border/40 bg-slate-900/60 px-4 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100 hover:border-slate-600/60 focus-visible:ring-slate-400">
                       Manter sala
                     </AlertDialogCancel>
                     <AlertDialogAction
@@ -2829,7 +2823,7 @@ export default function RoomPage({
                               variant="ghost"
                               size="sm"
                               onClick={() => void handleSetPresenter(selfParticipantId, true)}
-                              className="h-9 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-4 text-xs font-medium text-slate-300 shadow-sm transition-all hover:border-primary/40 hover:bg-slate-800 hover:text-slate-100"
+                              className="h-9 gap-2 rounded-xl border border-border/40 bg-slate-900/60 px-4 text-xs font-medium text-slate-300 shadow-sm transition-all hover:border-border/80 hover:bg-slate-800 hover:text-slate-100"
                             >
                               <MonitorUp className="h-3.5 w-3.5 text-primary" />
                               <span>{isHost ? 'Retomar transmissão' : 'Transmitir minha tela'}</span>
@@ -2860,7 +2854,7 @@ export default function RoomPage({
 
       {/* Modal de Seleção de Tela / Janela com Glass Styling */}
       <Dialog open={isSourcePickerOpen} onOpenChange={(open) => !open && closeSourcePicker()}>
-        <DialogContent className="flex max-h-[88vh] w-full max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl backdrop-blur-xl sm:max-w-4xl glass-surface-elevated">
+        <DialogContent className="flex max-h-[88vh] w-full max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-border/40 bg-card p-0 text-slate-100 shadow-2xl sm:max-w-4xl glass-surface-elevated">
           <DialogHeader className="border-b border-border/40 px-6 py-5 text-left">
             <div className="flex items-center gap-3.5 pr-8">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
@@ -2896,13 +2890,13 @@ export default function RoomPage({
                       setSelectedSourceId(null);
                       void onPrepareSource(null, includeSystemAudio);
                     }}
-                    className={`inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors ${
+                    className={`inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-all duration-200 ease-out active:scale-95 ${
                       isActive
-                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        ? 'bg-primary text-primary-foreground shadow-sm font-semibold'
                         : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
                     }`}
                   >
-                    <SourceIcon className="h-3.5 w-3.5" />
+                    <SourceIcon className="h-3.5 w-3.5 transition-transform duration-200" />
                     {isScreen ? 'Telas' : 'Janelas'}
                   </button>
                 );
@@ -2947,7 +2941,8 @@ export default function RoomPage({
               </p>
             )}
 
-            {isLoadingSources && filteredSources.length === 0 && (
+            <div key={sourceKind} className="topcast-tab-panel-animate">
+              {isLoadingSources && filteredSources.length === 0 && (
               <div role="status" className="flex min-h-64 flex-col items-center justify-center gap-3.5 text-center">
                 <div className="flex h-10 w-10 items-center justify-center text-primary">
                   <Loader2 className="h-7 w-7 animate-spin" />
@@ -2989,7 +2984,7 @@ export default function RoomPage({
                       className={`group flex flex-col overflow-hidden rounded-xl text-left border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-wait disabled:opacity-60 ${
                         isSelected
                           ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary'
-                          : 'border-border/40 bg-slate-950/60 backdrop-blur-sm hover:border-primary/50 hover:bg-slate-900/60'
+                          : 'border-border/40 bg-slate-900/80 hover:border-primary/50 hover:bg-slate-900'
                       }`}
                     >
                       <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
@@ -3013,12 +3008,12 @@ export default function RoomPage({
                 })}
               </div>
             )}
+            </div>
           </div>
 
           <div className="flex flex-col-reverse gap-3 border-t border-border/40 bg-slate-950/40 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-400">Qualidade:</span>
                 <div
                   role="radiogroup"
                   aria-label="Qualidade da transmissão"
@@ -3116,12 +3111,7 @@ export default function RoomPage({
 
       {/* Confirmação de expulsão de participante com AlertDialog */}
       <AlertDialog open={Boolean(participantToKick)} onOpenChange={(open) => !open && setParticipantToKick(null)}>
-        <AlertDialogContent className="max-w-md overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl backdrop-blur-xl sm:max-w-md">
-          {/* Luz ambiente superior suave */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-24 left-1/2 h-48 w-full -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-500/15 via-red-500/5 to-transparent blur-2xl"
-          />
+        <AlertDialogContent className="max-w-md overflow-hidden rounded-2xl border border-border/40 bg-slate-900/95 p-0 text-slate-100 shadow-2xl sm:max-w-md">
 
           {/* Header com borda inferior */}
           <div className="relative z-10 border-b border-border/40 px-6 py-5">
@@ -3151,7 +3141,7 @@ export default function RoomPage({
           <div className="relative z-10 flex flex-col-reverse gap-2.5 border-t border-border/40 bg-slate-950/40 px-6 py-4 sm:flex-row sm:justify-end">
             <AlertDialogCancel
               onClick={() => setParticipantToKick(null)}
-              className="w-full sm:w-auto h-9 rounded-xl border border-border/40 bg-slate-900/60 px-4 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100 focus-visible:ring-primary"
+              className="w-full sm:w-auto h-9 rounded-xl border border-border/40 bg-slate-900/60 px-4 text-xs font-medium text-slate-300 shadow-sm transition-all hover:bg-slate-800 hover:text-slate-100 hover:border-slate-600/60 focus-visible:ring-slate-400"
             >
               Cancelar
             </AlertDialogCancel>

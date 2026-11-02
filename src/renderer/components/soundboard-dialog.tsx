@@ -147,11 +147,6 @@ export function SoundboardDialog({
       )}
 
       <DialogContent className="max-w-md overflow-hidden rounded-2xl p-0 text-slate-100 glass-surface-elevated sm:max-w-md">
-        {/* Luz ambiente superior suave */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-24 left-1/2 h-48 w-full -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-primary/5 to-transparent blur-2xl"
-        />
 
         {/* Header */}
         <div className="relative z-10 border-b border-border/30 px-6 py-5">

@@ -16,6 +16,7 @@ describe('Theme Switcher', () => {
     // Mock global window and localStorage for node test environment
     const storage = new Map<string, string>();
     const docAttributes = new Map<string, string>();
+    const docClasses = new Set<string>();
 
     globalThis.window = {
       localStorage: {
@@ -39,12 +40,17 @@ describe('Theme Switcher', () => {
           docAttributes.set(name, value);
         },
         getAttribute: (name: string) => docAttributes.get(name) ?? null,
+        classList: {
+          add: (cls: string) => docClasses.add(cls),
+          remove: (cls: string) => docClasses.delete(cls),
+          contains: (cls: string) => docClasses.has(cls),
+        },
       },
     } as unknown as Document;
   });
 
-  it('provides well-formed theme options with distinct primary colors including graphite and aurora-pearl', () => {
-    assert.ok(THEME_OPTIONS.length >= 8);
+  it('provides well-formed theme options supporting strictly Light Mode and Dark Mode', () => {
+    assert.equal(THEME_OPTIONS.length, 2);
     const ids = new Set<string>();
     const primaryColors = new Set<string>();
 
@@ -62,22 +68,33 @@ describe('Theme Switcher', () => {
       primaryColors.add(theme.primaryColor);
     }
 
-    assert.ok(ids.has('graphite'));
-    assert.ok(ids.has('aurora-pearl'));
+    assert.ok(ids.has('dark'));
+    assert.ok(ids.has('light'));
   });
 
-  it('defaults to graphite when no theme is persisted', () => {
+  it('defaults to dark when no theme is persisted', () => {
     assert.equal(getSavedTheme(), DEFAULT_THEME);
-    assert.equal(DEFAULT_THEME, 'graphite');
+    assert.equal(DEFAULT_THEME, 'dark');
   });
 
   it('persists and applies chosen theme to document.documentElement and localStorage', () => {
-    const targetTheme: ThemeId = 'aurora-pearl';
+    const targetTheme: ThemeId = 'light';
     applyTheme(targetTheme);
 
-    assert.equal(document.documentElement.getAttribute('data-theme'), 'aurora-pearl');
-    assert.equal(window.localStorage.getItem(THEME_STORAGE_KEY), 'aurora-pearl');
-    assert.equal(getSavedTheme(), 'aurora-pearl');
+    assert.equal(document.documentElement.getAttribute('data-theme'), 'light');
+    assert.equal(window.localStorage.getItem(THEME_STORAGE_KEY), 'light');
+    assert.equal(getSavedTheme(), 'light');
+  });
+
+  it('migrates legacy themes (graphite, cyber-blue, aurora-pearl) cleanly to dark or light', () => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'graphite');
+    assert.equal(getSavedTheme(), 'dark');
+
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'aurora-pearl');
+    assert.equal(getSavedTheme(), 'light');
+
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'cyber-blue');
+    assert.equal(getSavedTheme(), 'dark');
   });
 
   it('falls back to DEFAULT_THEME if stored theme id is invalid', () => {
@@ -105,17 +122,8 @@ describe('Adaptive Glassmorphism Surface System (4 Levels)', () => {
     assert.ok(cssContent.includes('var(--glass-elevated-shadow)'));
   });
 
-  it('declares semantic glass tokens across all 8 themes', () => {
-    const requiredThemes: readonly ThemeId[] = [
-      'graphite',
-      'aurora-pearl',
-      'midnight-violet',
-      'cyber-blue',
-      'emerald-matrix',
-      'sunset-amber',
-      'nordic-cyan',
-      'crimson-rose',
-    ];
+  it('declares semantic surface tokens across Dark and Light modes', () => {
+    const requiredThemes: readonly ThemeId[] = ['dark', 'light'];
 
     for (const themeId of requiredThemes) {
       assert.ok(cssContent.includes(themeId), `Theme ${themeId} must be declared in CSS`);
@@ -130,8 +138,8 @@ describe('Adaptive Glassmorphism Surface System (4 Levels)', () => {
     assert.ok(cssContent.includes('--glass-elevated-border'));
   });
 
-  it('adapts Light Mode (Aurora Pearl) with luminous translucent glass rather than dark tints', () => {
-    assert.ok(cssContent.includes('/* Glassmorphism Tokens (Níveis 1 a 4) - Aurora Pearl (Light Mode) */'));
+  it('adapts Light Mode with luminous clean surface rather than dark tints', () => {
+    assert.ok(cssContent.includes('/* Superfícies Flat / Material Moderno - Light Mode */'));
     assert.ok(cssContent.includes('--glass-secondary-bg: rgba(255, 255, 255, 0.72)'));
     assert.ok(cssContent.includes('--glass-primary-bg: rgba(255, 255, 255, 0.82)'));
     assert.ok(cssContent.includes('--glass-elevated-bg: rgba(255, 255, 255, 0.96)'));
